@@ -9,6 +9,7 @@ use App\Models\Project\Contractor;
 use App\Models\Project\Project;
 use App\Models\Project\ProjectPhase;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class ProjectPhaseController extends Controller
@@ -17,14 +18,14 @@ class ProjectPhaseController extends Controller
     {
         return view('back.projects.phases.create', [
             'project' => $project,
-            'phase' => new ProjectPhase(),
+            'phase' => new ProjectPhase,
             'contractors' => Contractor::orderBy('nom')->get(),
         ]);
     }
 
     public function store(StoreProjectPhaseRequest $request, Project $project): RedirectResponse
     {
-        $phase = $project->projectPhases()->create($request->validated());
+        $phase = DB::transaction(fn () => $project->projectPhases()->create($request->validated()));
 
         return redirect()
             ->route('back.projects.show', $project)
@@ -46,7 +47,7 @@ class ProjectPhaseController extends Controller
     {
         $this->ensureBelongsToProject($project, $phase);
 
-        $phase->update($request->validated());
+        DB::transaction(fn () => $phase->update($request->validated()));
 
         return redirect()
             ->route('back.projects.show', $project)
@@ -58,7 +59,7 @@ class ProjectPhaseController extends Controller
         $this->ensureBelongsToProject($project, $phase);
 
         $nom = $phase->nom;
-        $phase->delete();
+        DB::transaction(fn () => $phase->delete());
 
         return redirect()
             ->route('back.projects.show', $project)

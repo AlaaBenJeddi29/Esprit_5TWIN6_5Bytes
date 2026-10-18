@@ -8,6 +8,7 @@ use App\Http\Requests\Project\UpdateProjectDocumentRequest;
 use App\Models\Project\Project;
 use App\Models\Project\ProjectDocument;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 
@@ -17,7 +18,7 @@ class ProjectDocumentController extends Controller
     {
         return view('back.projects.documents.create', [
             'project' => $project,
-            'document' => new ProjectDocument(),
+            'document' => new ProjectDocument,
             'types' => ProjectDocument::TYPES,
         ]);
     }
@@ -29,7 +30,7 @@ class ProjectDocumentController extends Controller
             ->store("projects/{$project->id}/documents", 'local');
         unset($data['fichier']);
 
-        $project->projectDocuments()->create($data);
+        DB::transaction(fn () => $project->projectDocuments()->create($data));
 
         return redirect()
             ->route('back.projects.show', $project)
@@ -61,7 +62,7 @@ class ProjectDocumentController extends Controller
                 ->store("projects/{$project->id}/documents", 'local');
         }
 
-        $document->update($data);
+        DB::transaction(fn () => $document->update($data));
 
         if (isset($data['chemin_fichier']) && $previousPath !== $data['chemin_fichier']) {
             Storage::disk('local')->delete($previousPath);
@@ -77,7 +78,7 @@ class ProjectDocumentController extends Controller
         $this->ensureBelongsToProject($project, $document);
 
         $path = $document->chemin_fichier;
-        $document->delete();
+        DB::transaction(fn () => $document->delete());
 
         if (is_string($path) && $path !== '') {
             Storage::disk('local')->delete($path);

@@ -2,6 +2,8 @@
 
 @section('title', 'AquaSecure — '.$project->titre)
 
+@php use App\Services\ProjectDeadlineIndicators; @endphp
+
 @section('content')
     @include('front.partials.page-hero', [
         'eyebrow' => 'Projet · '.ucfirst(str_replace('_', ' ', $project->type)),
@@ -15,7 +17,7 @@
 
             @php
                 $inputClass = 'w-full rounded-md border border-stroke bg-transparent px-5 py-3 text-sm text-dark outline-none focus:border-primary dark:border-dark-3 dark:text-white';
-                $rate = $project->fundingRate();
+                $rate = $metrics->fundingRate;
             @endphp
 
             <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -50,7 +52,17 @@
                             </div>
                             <div>
                                 <dt class="text-body-color dark:text-dark-6">Fin prévue</dt>
-                                <dd class="mt-1 font-medium text-dark dark:text-white">{{ $project->date_fin_prevue?->format('d/m/Y') ?? '—' }}</dd>
+                                <dd class="mt-1 font-medium text-dark dark:text-white">
+                                    {{ $project->date_fin_prevue?->format('d/m/Y') ?? '—' }}
+                                    @php($echeanceProjet = ProjectDeadlineIndicators::projectStatus($project))
+                                    @if (! ProjectDeadlineIndicators::projectIsClosed($project) && $echeanceProjet === ProjectDeadlineIndicators::ECHEANCE_DEPASSEE)
+                                        <span class="ml-1 inline-block rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-600"
+                                              title="{{ ProjectDeadlineIndicators::projectExplanation($project) }}">Échéance dépassée</span>
+                                    @elseif (! ProjectDeadlineIndicators::projectIsClosed($project) && $echeanceProjet === ProjectDeadlineIndicators::ECHEANCE_PROCHE)
+                                        <span class="ml-1 inline-block rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-600"
+                                              title="{{ ProjectDeadlineIndicators::projectExplanation($project) }}">Échéance proche</span>
+                                    @endif
+                                </dd>
                             </div>
                         </dl>
                     </div>
@@ -69,6 +81,14 @@
                                     {{ $phase->contractor?->nom ?? 'Entreprise non affectée' }}
                                     @if ($phase->date_debut || $phase->date_fin)
                                         · {{ $phase->date_debut?->format('d/m/Y') ?? '—' }} → {{ $phase->date_fin?->format('d/m/Y') ?? '—' }}
+                                    @endif
+                                    @php($echeancePhase = ProjectDeadlineIndicators::phaseStatus($phase))
+                                    @if (! ProjectDeadlineIndicators::projectIsClosed($project) && $echeancePhase === ProjectDeadlineIndicators::ECHEANCE_DEPASSEE)
+                                        <span class="ml-1 inline-block rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-600"
+                                              title="{{ ProjectDeadlineIndicators::phaseExplanation($phase) }}">En retard</span>
+                                    @elseif (! ProjectDeadlineIndicators::projectIsClosed($project) && $echeancePhase === ProjectDeadlineIndicators::ECHEANCE_PROCHE)
+                                        <span class="ml-1 inline-block rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-600"
+                                              title="{{ ProjectDeadlineIndicators::phaseExplanation($phase) }}">Échéance proche</span>
                                     @endif
                                 </p>
                                 <div class="mt-2 h-1.5 w-full rounded-full bg-gray-1 dark:bg-dark-3">
@@ -145,11 +165,15 @@
                         <dl class="mt-5 space-y-2 text-sm">
                             <div class="flex justify-between gap-3">
                                 <dt class="text-body-color dark:text-dark-6">Budget prévu</dt>
-                                <dd class="font-semibold text-dark dark:text-white">{{ number_format((float) $project->budget_prevu, 2, ',', ' ') }} €</dd>
+                                <dd class="font-semibold text-dark dark:text-white">{{ number_format($metrics->budgetPrevu, 2, ',', ' ') }} €</dd>
                             </div>
                             <div class="flex justify-between gap-3">
                                 <dt class="text-body-color dark:text-dark-6">Financements enregistrés</dt>
-                                <dd class="font-semibold text-dark dark:text-white">{{ number_format($project->fundingTotal(), 2, ',', ' ') }} €</dd>
+                                <dd class="font-semibold text-dark dark:text-white">{{ number_format($metrics->fundingTotal, 2, ',', ' ') }} €</dd>
+                            </div>
+                            <div class="flex justify-between gap-3">
+                                <dt class="text-body-color dark:text-dark-6">Reste à financer</dt>
+                                <dd class="font-semibold text-dark dark:text-white">{{ number_format($metrics->fundingGap, 2, ',', ' ') }} €</dd>
                             </div>
                             <div class="flex justify-between gap-3">
                                 <dt class="text-body-color dark:text-dark-6">Dont dons simulés</dt>

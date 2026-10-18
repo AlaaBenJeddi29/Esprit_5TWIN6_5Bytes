@@ -9,18 +9,18 @@ use App\Models\Infrastructure\Zone;
 use App\Models\Project\Project;
 use App\Models\Project\ProjectDocument;
 use App\Services\ProjectAssistant;
+use App\Services\ProjectMetrics;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ProjectController extends Controller
 {
-    public function __construct(private readonly ProjectAssistant $assistant)
-    {
-    }
+    public function __construct(private readonly ProjectAssistant $assistant) {}
 
     public function index(Request $request): View
     {
@@ -60,6 +60,7 @@ class ProjectController extends Controller
 
         return view('front.projects.show', [
             'project' => $project,
+            'metrics' => new ProjectMetrics($project),
             'donationsCount' => $donationsCount,
             'donationsTotal' => $donationsTotal,
             'assistantAnswer' => session('assistant_answer'),
@@ -72,12 +73,12 @@ class ProjectController extends Controller
     {
         abort_if($project->statut === 'annulé', 404);
 
-        $project->fundings()->create([
+        DB::transaction(fn () => $project->fundings()->create([
             'source' => 'don',
             'donateur_id' => $request->user()->id,
             'montant' => $request->validated('montant'),
             'date_versement' => now()->toDateString(),
-        ]);
+        ]));
 
         return redirect()
             ->route('public.projects.show', $project)

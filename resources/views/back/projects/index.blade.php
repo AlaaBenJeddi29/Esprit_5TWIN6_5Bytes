@@ -2,6 +2,8 @@
 
 @section('title', 'AquaSecure — Projets')
 
+@php use App\Services\ProjectDeadlineIndicators; @endphp
+
 @section('content')
 
     <x-back.page-header title="Projets" desc="Projets d'investissement et de réhabilitation du réseau.">
@@ -46,8 +48,25 @@
                     </thead>
                     <tbody>
                         @foreach ($projects as $project)
+                            @php($echeance = ProjectDeadlineIndicators::projectStatus($project))
                             <tr class="border-b border-gray-100 transition-colors last:border-0 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/[0.02]">
-                                <td class="px-5 py-3 text-sm font-medium text-gray-800 dark:text-white/90">{{ $project->titre }}</td>
+                                <td class="px-5 py-3">
+                                    <p class="text-sm font-medium text-gray-800 dark:text-white/90">{{ $project->titre }}</p>
+                                    <div class="mt-1 flex flex-wrap gap-1">
+                                        @if ($echeance === ProjectDeadlineIndicators::ECHEANCE_DEPASSEE)
+                                            <span class="inline-block rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-600 dark:bg-red-500/10 dark:text-red-300"
+                                                  title="{{ ProjectDeadlineIndicators::projectExplanation($project) }}">Échéance dépassée</span>
+                                        @elseif ($echeance === ProjectDeadlineIndicators::ECHEANCE_PROCHE)
+                                            <span class="inline-block rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-600 dark:bg-amber-500/10 dark:text-amber-300"
+                                                  title="{{ ProjectDeadlineIndicators::projectExplanation($project) }}">Échéance proche</span>
+                                        @endif
+                                        @if (! ProjectDeadlineIndicators::projectIsClosed($project) && $project->overdue_phases_count > 0)
+                                            <span class="inline-block rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-600 dark:bg-red-500/10 dark:text-red-300">
+                                                {{ $project->overdue_phases_count }} phase(s) en retard
+                                            </span>
+                                        @endif
+                                    </div>
+                                </td>
                                 <td class="px-5 py-3 text-sm text-gray-500 dark:text-gray-400">{{ ucfirst($project->type) }}</td>
                                 <td class="px-5 py-3 text-sm text-gray-500 dark:text-gray-400">{{ $project->zone?->nom ?? '—' }}</td>
                                 <td class="px-5 py-3 text-sm text-gray-500 dark:text-gray-400">{{ ucfirst(str_replace('_', ' ', $project->statut)) }}</td>

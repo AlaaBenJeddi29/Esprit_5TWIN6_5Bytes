@@ -63,4 +63,28 @@ return [
         'timeout' => (int) env('OLLAMA_TIMEOUT', 120),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Local LLM layer (Ollama only — Gestion 5 and future modules)
+    |--------------------------------------------------------------------------
+    |
+    | Zero-cost, reusable layer consumed by App\Services\LocalLlmService.
+    | Inference goes ONLY to an Ollama installed on this machine: the host
+    | must be localhost / 127.x / ::1 (enforced in code, no external call is
+    | ever made). The application keeps working when Ollama is unavailable —
+    | callers receive a predictable success/failure result. Defaults are
+    | non-secret; see .env.example for the manual setup commands.
+    |
+    */
+
+    'local_llm' => [
+        'enabled' => (bool) env('LOCAL_LLM_ENABLED', true),
+        // Falls back to the Gestion 1 Ollama URL when not set.
+        'url' => env('LOCAL_LLM_URL', env('OLLAMA_URL', 'http://localhost:11434')),
+        'model' => env('LOCAL_LLM_MODEL', 'llama3.2'),
+        'timeout' => (int) env('LOCAL_LLM_TIMEOUT', 120),
+        'connect_timeout' => (int) env('LOCAL_LLM_CONNECT_TIMEOUT', 5),
+        'temperature' => (float) env('LOCAL_LLM_TEMPERATURE', 0.3),
+    ],
+
 ];

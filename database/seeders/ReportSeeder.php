@@ -57,10 +57,13 @@ class ReportSeeder extends Seeder
         ];
 
         foreach ($demo as $attributes) {
-            Report::create($attributes + [
-                'user_id' => null,
-                'reported_at' => now()->subDays(random_int(1, 20)),
-            ]);
+            Report::firstOrCreate(
+                ['title' => $attributes['title']],
+                $attributes + [
+                    'user_id' => null,
+                    'reported_at' => now()->subDays(random_int(1, 20)),
+                ],
+            );
         }
     }
 }

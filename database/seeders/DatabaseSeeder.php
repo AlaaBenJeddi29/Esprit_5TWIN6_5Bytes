@@ -10,15 +10,17 @@ class DatabaseSeeder extends Seeder
     use WithoutModelEvents;
 
     /**
-     * Seed the application's database.
+     * Seed the application's database with the demo dataset.
      *
-     * Aucun seeder de démonstration n'est appelé automatiquement. Lancez
-     * explicitement ceux dont vous avez besoin, par exemple :
-     *   php artisan db:seed --class=DemoUsersSeeder
-     *   php artisan db:seed --class=DemoDataSeeder
+     * DemoUsersSeeder runs first : DemoDataSeeder bails without an existing
+     * gestionnaire/admin account. Each seeder self-guards and skips in production.
      */
     public function run(): void
     {
-        //
+        $this->call([
+            DemoUsersSeeder::class,
+            DemoDataSeeder::class,
+            ReportSeeder::class,
+        ]);
     }
 }

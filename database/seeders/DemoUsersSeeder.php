@@ -18,8 +18,8 @@ use Illuminate\Database\Seeder;
  * - idempotent : relancer le seeder actualise les comptes existants ;
  * - ne journalise jamais les mots de passe.
  *
- * Ce seeder n'est PAS appelé automatiquement par DatabaseSeeder ; il doit
- * être déclenché explicitement (php artisan db:seed --class=DemoUsersSeeder).
+ * Appelé par DatabaseSeeder (php artisan db:seed) ; exécutable aussi seul :
+ * php artisan db:seed --class=DemoUsersSeeder.
  */
 class DemoUsersSeeder extends Seeder
 {
