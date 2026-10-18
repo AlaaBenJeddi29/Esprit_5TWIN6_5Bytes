@@ -57,4 +57,73 @@
         @endif
     </div>
 
+    {{-- =====================================================================
+         BLOC : Prévision du coût de maintenance (3 prochains mois)
+         Chart.js n'étant pas présent dans le projet, affichage en tableau
+         mois / coût / type (réel ou prévu).
+         ===================================================================== --}}
+    <div class="mt-6 overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+        <div class="border-b border-gray-100 px-5 py-4 dark:border-gray-800">
+            <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-300">Prévision du coût de maintenance</h2>
+            <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">Prévision indicative basée sur la moyenne des 3 derniers mois.</p>
+        </div>
+
+        @if ($historiqueBrut === [])
+            <div class="p-5">
+                <x-back.empty-state title="Aucun historique" message="Aucune maintenance terminée sur les 6 derniers mois pour cette zone : prévision indisponible." />
+            </div>
+        @else
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead>
+                        <tr class="border-b border-gray-100 text-left text-xs uppercase text-gray-500 dark:border-gray-800 dark:text-gray-400">
+                            <th class="px-5 py-3 font-medium">Mois</th>
+                            <th class="px-5 py-3 font-medium text-right">Coût (DT)</th>
+                            <th class="px-5 py-3 font-medium">Type</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @php
+                            /* Étiquette de mois en français (ex. : « sept. 2026 ») */
+                            $libelleMois = fn (string $mois) => \Carbon\Carbon::createFromFormat('Y-m', $mois)->locale('fr')->translatedFormat('M Y');
+                        @endphp
+
+                        {{-- 6 mois réels (trait plein dans un graphique, ici lignes "Réel") --}}
+                        @foreach ($historiqueBrut as $mois => $cout)
+                            <tr class="border-b border-gray-100 last:border-0 dark:border-gray-800">
+                                <td class="px-5 py-3 text-sm text-gray-800 dark:text-white/90">{{ $libelleMois($mois) }}</td>
+                                <td class="px-5 py-3 text-sm text-right text-gray-500 dark:text-gray-400">{{ number_format($cout, 2, ',', ' ') }}</td>
+                                <td class="px-5 py-3">
+                                    <span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-400">Réel</span>
+                                </td>
+                            </tr>
+                        @endforeach
+
+                        {{-- 3 mois prévus (trait pointillé dans un graphique, ici lignes "Prévu") --}}
+                        @foreach ($moisPrevus as $mois => $cout)
+                            <tr class="border-b border-gray-100 last:border-0 bg-brand-50/40 dark:border-gray-800 dark:bg-brand-500/5">
+                                <td class="px-5 py-3 text-sm text-gray-800 dark:text-white/90">{{ $libelleMois($mois) }}</td>
+                                <td class="px-5 py-3 text-sm text-right text-gray-500 dark:text-gray-400">
+                                    {{ $cout !== null ? number_format($cout, 2, ',', ' ') : '—' }}
+                                </td>
+                                <td class="px-5 py-3">
+                                    <span class="inline-flex items-center rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-medium text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">Prévu</span>
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+
+            {{-- Total prévu pour les 3 prochains mois --}}
+            <div class="flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 px-5 py-4 dark:border-gray-800">
+                <p class="text-xs text-gray-500 dark:text-gray-400">Prévision indicative basée sur la moyenne des 3 derniers mois.</p>
+                <p class="text-sm font-semibold text-gray-800 dark:text-white/90">
+                    Coût prévu (3 mois) :
+                    {{ $prevision !== null ? number_format($prevision, 2, ',', ' ').' DT' : '—' }}
+                </p>
+            </div>
+        @endif
+    </div>
+
 @endsection
