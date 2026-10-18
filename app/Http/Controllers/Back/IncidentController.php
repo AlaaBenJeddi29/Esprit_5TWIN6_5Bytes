@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Back;
 
+use App\Exceptions\InvalidIncidentTransitionException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Incident\StoreBackIncidentRequest;
 use App\Http\Requests\Incident\StoreIncidentCommentRequest;
@@ -11,6 +12,7 @@ use App\Models\Incident\Incident;
 use App\Models\Infrastructure\Infrastructure;
 use App\Models\Infrastructure\Zone;
 use App\Models\User;
+use App\Services\IncidentWorkflowService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -18,6 +20,10 @@ use Illuminate\View\View;
 
 class IncidentController extends Controller
 {
+    public function __construct(
+        private readonly IncidentWorkflowService $workflow,
+    ) {
+    }
     public function index(Request $request): View
     {
         $search = $request->string('search')->toString();
@@ -68,6 +74,10 @@ class IncidentController extends Controller
         $data = $request->validated();
         $data['user_id'] = $request->user()->id;
         $data['reported_at'] = now();
+        $data['status'] = 'nouveau';
+        $data['resolved_at'] = null;
+        $data['resolution_note'] = null;
+        $data['rejection_reason'] = null;
 
         $incident = Incident::create($data);
 
@@ -99,7 +109,7 @@ class IncidentController extends Controller
 
         return view('back.incidents.show', [
             'incident' => $incident,
-            'statuses' => Incident::STATUSES,
+            'allowedTransitions' => $this->workflow->allowedTransitions($incident),
         ]);
     }
 
@@ -110,19 +120,9 @@ class IncidentController extends Controller
 
     public function update(UpdateBackIncidentRequest $request, Incident $incident): RedirectResponse
     {
-        $data = $request->validated();
-        $newStatus = $data['status'];
-        unset($data['status']);
-
-        if (array_key_exists('resolution_note', $data) && blank($data['resolution_note'])) {
-            $data['resolution_note'] = null;
-        }
-
-        $incident->update($data);
-
-        if ($incident->status !== $newStatus) {
-            $incident->changeStatus($newStatus, $request->user(), "Statut modifié depuis le formulaire d'édition.");
-        }
+        // Le statut et les comptes rendus sont exclus du payload validé :
+        // seule la route dédiée au workflow peut les modifier.
+        $incident->update($request->validated());
 
         return redirect()
             ->route('back.incidents.show', $incident)
@@ -133,11 +133,20 @@ class IncidentController extends Controller
     {
         $data = $request->validated();
 
-        if (! empty($data['resolution_note'])) {
-            $incident->update(['resolution_note' => $data['resolution_note']]);
+        try {
+            $this->workflow->transition(
+                $incident,
+                $data['status'],
+                $request->user(),
+                $data['comment'] ?? null,
+                $data['resolution_note'] ?? null,
+                $data['rejection_reason'] ?? null,
+            );
+        } catch (InvalidIncidentTransitionException $exception) {
+            return back()
+                ->withErrors(['status' => $exception->getMessage()])
+                ->withInput();
         }
-
-        $incident->changeStatus($data['status'], $request->user(), $data['comment'] ?? null);
 
         return back()->with('success', 'Le statut de l\'incident a été mis à jour.');
     }
@@ -189,7 +198,6 @@ class IncidentController extends Controller
             'zones' => Zone::orderBy('nom')->get(),
             'infrastructures' => Infrastructure::orderBy('nom')->get(),
             'types' => Incident::TYPES,
-            'statuses' => Incident::STATUSES,
             'severities' => Incident::SEVERITIES,
             'priorities' => Incident::PRIORITIES,
             'gestionnaires' => User::query()

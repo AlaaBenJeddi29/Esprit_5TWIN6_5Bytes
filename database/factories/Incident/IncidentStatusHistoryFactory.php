@@ -22,6 +22,8 @@ class IncidentStatusHistoryFactory extends Factory
             'ancien_statut' => 'nouveau',
             'nouveau_statut' => 'en_cours',
             'comment' => fake()->sentence(),
+            'resolution_note' => null,
+            'rejection_reason' => null,
         ];
     }
 }
