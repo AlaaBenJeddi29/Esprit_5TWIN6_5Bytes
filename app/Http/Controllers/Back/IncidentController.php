@@ -17,19 +17,23 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class IncidentController extends Controller
 {
     public function __construct(
         private readonly IncidentWorkflowService $workflow,
-    ) {
-    }
+    ) {}
+
     public function index(Request $request): View
     {
         $search = $request->string('search')->toString();
         $status = $request->string('status')->toString();
         $type = $request->string('type')->toString();
+        $severity = $request->string('severity')->toString();
         $zoneId = $request->integer('zone_id');
+        $unassigned = $request->boolean('unassigned');
+        $open = $request->boolean('open');
 
         $incidents = Incident::query()
             ->with(['user', 'zone', 'assignee'])
@@ -42,7 +46,13 @@ class IncidentController extends Controller
             })
             ->when(array_key_exists($status, Incident::STATUSES), fn ($query) => $query->where('status', $status))
             ->when(array_key_exists($type, Incident::TYPES), fn ($query) => $query->where('type', $type))
+            ->when(array_key_exists($severity, Incident::SEVERITIES), fn ($query) => $query->where('severity', $severity))
             ->when($zoneId, fn ($query) => $query->where('zone_id', $zoneId))
+            ->when($open, fn ($query) => $query->open())
+            ->when(
+                $unassigned,
+                fn ($query) => $query->whereNull('assigned_to')->where('is_duplicate', false)
+            )
             ->latest('reported_at')
             ->paginate(15)
             ->withQueryString();
@@ -51,11 +61,15 @@ class IncidentController extends Controller
             'incidents' => $incidents,
             'statuses' => Incident::STATUSES,
             'types' => Incident::TYPES,
+            'severities' => Incident::SEVERITIES,
             'zones' => Zone::orderBy('nom')->get(),
             'search' => $search,
             'currentStatus' => $status,
             'currentType' => $type,
+            'currentSeverity' => $severity,
             'currentZone' => $zoneId ?: null,
+            'currentUnassigned' => $unassigned,
+            'currentOpen' => $open,
         ]);
     }
 
@@ -176,7 +190,7 @@ class IncidentController extends Controller
             ->with('success', "L'incident {$reference} a été supprimé.");
     }
 
-    public function downloadPhoto(Incident $incident, int $photoId): \Symfony\Component\HttpFoundation\StreamedResponse
+    public function downloadPhoto(Incident $incident, int $photoId): StreamedResponse
     {
         $photo = $incident->photos()->findOrFail($photoId);
 

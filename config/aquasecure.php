@@ -32,6 +32,15 @@ return [
     |
     */
 
+    'incident_map' => [
+        /*
+        | Nombre maximal de marqueurs renvoyés par l'endpoint JSON. Les
+        | compteurs restent calculés sur l'ensemble filtré ; ce plafond
+        | protège uniquement le rendu côté navigateur.
+        */
+        'max_markers' => env('AQUASECURE_INCIDENT_MAP_MAX_MARKERS', 2000),
+    ],
+
     'demo' => [
         'password' => env('AQUASECURE_DEMO_PASSWORD'),
         'users' => [
