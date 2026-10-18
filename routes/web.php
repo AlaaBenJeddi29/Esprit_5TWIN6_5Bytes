@@ -122,6 +122,9 @@ Route::middleware(['auth', 'verified', 'role:gestionnaire,admin'])
             ->except(['destroy']);
 
         // Gestion 1 — Infrastructures (zones, infrastructures, maintenances)
+        // Rapport global PDF — déclaré AVANT la ressource pour ne pas être
+        // capturé par la route zones.show ({zone}).
+        Route::get('zones/rapport-global', [ZoneController::class, 'rapportGlobal'])->name('zones.rapport-global');
         Route::resource('zones', ZoneController::class)->names('zones');
         Route::resource('infrastructures', InfrastructureController::class)->names('infrastructures');
         Route::post('infrastructures/{infrastructure}/score-risque', [InfrastructureController::class, 'refreshRiskScore'])
