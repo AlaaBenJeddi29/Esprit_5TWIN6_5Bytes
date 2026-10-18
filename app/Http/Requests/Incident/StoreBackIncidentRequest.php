@@ -29,12 +29,13 @@ class StoreBackIncidentRequest extends FormRequest
             'longitude' => ['nullable', 'numeric', 'between:-180,180'],
             'severity' => ['required', Rule::in(array_keys(Incident::SEVERITIES))],
             'priority' => ['required', Rule::in(array_keys(Incident::PRIORITIES))],
-            'status' => ['required', Rule::in(array_keys(Incident::STATUSES))],
+            // Le statut initial est imposé par le workflow : un incident créé
+            // depuis le Back Office démarre toujours à « nouveau ».
+            'status' => ['sometimes', Rule::in(['nouveau'])],
             'assigned_to' => [
                 'nullable',
                 Rule::exists('users', 'id')->whereIn('role', ['gestionnaire', 'admin']),
             ],
-            'resolution_note' => ['nullable', 'string', 'max:2000'],
         ];
     }
 }

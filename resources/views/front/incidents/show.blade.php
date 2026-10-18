@@ -26,11 +26,46 @@
                     'rejete' => 'bg-red-50 text-red-500',
                     default => 'bg-gray-1 text-body-color',
                 };
+                $stages = [
+                    'nouveau' => 'Signalé',
+                    'en_cours' => 'En cours',
+                    'en_attente' => 'En attente',
+                    'traite' => 'Traité',
+                ];
+                $reachedStatuses = $incident->statusHistories->pluck('nouveau_statut')->push($incident->status)->filter()->unique();
+                $stageRank = array_flip(array_keys($stages));
+                $currentRank = $stageRank[$incident->status] ?? -1;
             @endphp
 
             <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
                 {{-- Colonne principale --}}
                 <div class="space-y-6 lg:col-span-2">
+                {{-- Progression du signalement --}}
+                <div class="rounded-md bg-white p-6 shadow-1 dark:bg-dark-2 md:p-8">
+                    <h2 class="text-lg font-bold text-dark dark:text-white">Progression</h2>
+                    <ol class="mt-5 grid grid-cols-4 gap-2">
+                        @foreach ($stages as $key => $label)
+                            @php $done = $currentRank >= $loop->index || $reachedStatuses->contains($key); @endphp
+                            <li class="flex flex-col items-center text-center">
+                                <span class="flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold {{ $done ? 'bg-primary text-white' : 'bg-gray-1 text-body-color dark:bg-dark-3 dark:text-dark-6' }}">
+                                    {{ $done ? '✓' : $loop->iteration }}
+                                </span>
+                                <span class="mt-2 text-xs font-medium {{ $done ? 'text-primary' : 'text-body-color dark:text-dark-6' }}">{{ $label }}</span>
+                            </li>
+                        @endforeach
+                    </ol>
+
+                    @if ($incident->status === 'rejete')
+                        <div class="mt-4 rounded-md bg-red-50 p-4">
+                            <p class="text-sm font-semibold text-red-600">Signalement rejeté</p>
+                            @if ($incident->rejection_reason)
+                                <p class="mt-2 text-xs font-semibold uppercase tracking-wide text-red-600">Motif de rejet</p>
+                                <p class="mt-1 whitespace-pre-line text-sm text-red-700">{{ $incident->rejection_reason }}</p>
+                            @endif
+                        </div>
+                    @endif
+                </div>
+
                     <div class="rounded-md bg-white p-6 shadow-1 dark:bg-dark-2 md:p-8">
                         <div class="flex flex-wrap items-center gap-2">
                             <span class="inline-flex rounded-full px-3 py-1 text-xs font-medium {{ $tone($incident->status) }}">{{ $incident->statusLabel() }}</span>
@@ -73,7 +108,7 @@
 
                         @if ($incident->resolution_note)
                             <div class="mt-5 rounded-md bg-green-50 p-4">
-                                <p class="text-sm font-semibold text-secondary">Résolution</p>
+                                <p class="text-sm font-semibold text-secondary">Compte rendu de résolution</p>
                                 <p class="mt-1 whitespace-pre-line text-sm text-green-800">{{ $incident->resolution_note }}</p>
                                 @if ($incident->resolved_at)
                                     <p class="mt-1 text-xs text-green-700">Clôturé le {{ $incident->resolved_at->format('d/m/Y H:i') }}</p>
@@ -155,7 +190,13 @@
                         <ol class="mt-4 space-y-4">
                             @forelse ($incident->statusHistories as $history)
                                 <li class="border-l-2 border-primary pl-4">
-                                    <p class="text-sm font-medium text-dark dark:text-white">{{ $history->nouveauStatutLabel() }}</p>
+                                    <p class="text-sm font-medium text-dark dark:text-white">
+                                        @if ($history->ancienStatutLabel())
+                                            {{ $history->ancienStatutLabel() }} → {{ $history->nouveauStatutLabel() }}
+                                        @else
+                                            {{ $history->nouveauStatutLabel() }} <span class="text-xs font-normal text-body-color dark:text-dark-6">(création)</span>
+                                        @endif
+                                    </p>
                                     <p class="mt-1 text-xs text-body-color dark:text-dark-6">
                                         {{ $history->created_at?->format('d/m/Y H:i') }}
                                         @if ($history->user)
@@ -163,7 +204,17 @@
                                         @endif
                                     </p>
                                     @if ($history->comment)
-                                        <p class="mt-1 text-xs text-body-color dark:text-dark-6">{{ $history->comment }}</p>
+                                        <p class="mt-1 whitespace-pre-line text-xs text-body-color dark:text-dark-6">{{ $history->comment }}</p>
+                                    @endif
+                                    @if ($history->resolution_note)
+                                        <p class="mt-1 whitespace-pre-line text-xs text-body-color dark:text-dark-6">
+                                            <span class="font-semibold">Compte rendu :</span> {{ $history->resolution_note }}
+                                        </p>
+                                    @endif
+                                    @if ($history->rejection_reason)
+                                        <p class="mt-1 whitespace-pre-line text-xs text-body-color dark:text-dark-6">
+                                            <span class="font-semibold">Motif de rejet :</span> {{ $history->rejection_reason }}
+                                        </p>
                                     @endif
                                 </li>
                             @empty

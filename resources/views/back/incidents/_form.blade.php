@@ -92,13 +92,16 @@
     </div>
 
     <div>
-        <label for="status" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Statut <span class="text-error-500">*</span></label>
-        <select id="status" name="status" class="{{ $inputClass }}">
-            @foreach ($statuses as $key => $label)
-                <option value="{{ $key }}" @selected(old('status', $incident->status) === $key)>{{ $label }}</option>
-            @endforeach
-        </select>
-        @error('status')<p class="mt-1 text-xs text-error-600">{{ $message }}</p>@enderror
+        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Statut</label>
+        <div class="mt-1 flex items-center gap-2">
+            <span class="inline-flex rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-medium text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
+                {{ $incident->statusLabel() }}
+            </span>
+            <span class="text-xs text-gray-500 dark:text-gray-400">Géré depuis la fiche via le workflow</span>
+        </div>
+        <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+            Le statut ne peut pas être modifié ici : utilisez le formulaire de transition sur la fiche de l'incident.
+        </p>
     </div>
 
     <div>
@@ -110,12 +113,6 @@
             @endforeach
         </select>
         @error('assigned_to')<p class="mt-1 text-xs text-error-600">{{ $message }}</p>@enderror
-    </div>
-
-    <div class="md:col-span-2">
-        <label for="resolution_note" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Note de résolution</label>
-        <textarea id="resolution_note" name="resolution_note" rows="3" class="{{ $inputClass }}">{{ old('resolution_note', $incident->resolution_note) }}</textarea>
-        @error('resolution_note')<p class="mt-1 text-xs text-error-600">{{ $message }}</p>@enderror
     </div>
 </div>
 
