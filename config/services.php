@@ -35,4 +35,21 @@ return [
         ],
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Ollama (IA locale — rapports de la Gestion 1)
+    |--------------------------------------------------------------------------
+    |
+    | Serveur Ollama exécuté en local sur le poste du gestionnaire. Aucun
+    | service distant n'est contacté : l'URL et le modèle sont configurables
+    | via .env pour s'adapter à chaque PC.
+    |
+    */
+
+    'ollama' => [
+        'url' => env('OLLAMA_URL', 'http://localhost:11434'),
+        'model' => env('OLLAMA_MODEL', 'llama3.2'),
+        'timeout' => env('OLLAMA_TIMEOUT', 120),
+    ],
+
 ];

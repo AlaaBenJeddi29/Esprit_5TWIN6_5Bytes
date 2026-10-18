@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(sleep 4; curl -s -o /dev/null -w \"%{http_code}\" http://localhost:8000/)",
+      "Bash(npm install 2>&1 | tail -5)"
+    ]
+  }
+}
