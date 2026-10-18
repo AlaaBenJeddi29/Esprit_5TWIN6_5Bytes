@@ -23,6 +23,32 @@
         </x-slot:action>
     </x-back.page-header>
 
+    {{-- Rapport PDF par zone --}}
+    <div class="mb-8 rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+                <h2 class="text-base font-medium text-gray-800 dark:text-white/90">Rapport PDF par zone</h2>
+                <p class="mt-1 max-w-2xl text-sm text-gray-500 dark:text-gray-400">Génère un rapport contenant uniquement les prélèvements, mesures, seuils, statuts et alertes de la zone sélectionnée.</p>
+            </div>
+
+            <form method="GET" action="{{ route('back.quality-samples.index') }}" class="flex flex-wrap items-end gap-2">
+                <input type="hidden" name="pdf" value="1">
+
+                <div>
+                    <label for="report-zone" class="mb-1 block text-sm text-gray-500 dark:text-gray-400">Zone</label>
+                    <select id="report-zone" name="perimetre" required class="{{ $inputClass }}">
+                        <option value="">Sélectionnez une zone…</option>
+                        @foreach ($zones as $zoneOption)
+                            <option value="{{ $zoneOption->id }}" @selected($perimetre?->id === $zoneOption->id)>{{ $zoneOption->nom }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <button type="submit" @disabled($zones->isEmpty()) class="inline-flex items-center justify-center rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white shadow-theme-xs transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50">Générer un rapport PDF</button>
+            </form>
+        </div>
+    </div>
+
     {{-- Tableau de bord --}}
     <div class="mb-8">
         <h2 class="mb-4 text-base font-medium text-gray-800 dark:text-white/90">Tableau de bord qualité</h2>
