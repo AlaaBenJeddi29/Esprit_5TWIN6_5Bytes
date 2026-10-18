@@ -9,6 +9,7 @@ use App\Models\Quality\WaterQualityParameter;
 use App\Models\Quality\WaterQualitySample;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -134,6 +135,142 @@ class QualityAnalyzer
             'alertes_actives' => WaterQualityAlert::where('zone_id', $zone->id)->where('statut', 'active')->count(),
             'conformite_90j' => $total90 > 0 ? round(($conformes90 / $total90) * 100, 1) : null,
         ];
+    }
+
+    /**
+     * Indicateurs réels du module qualité, indépendants des filtres d'affichage.
+     *
+     * @return array{total: int, conformes: int, non_conformes: int, alertes_actives: int, dernier_prelevement: Carbon|null}
+     */
+    public function statistics(): array
+    {
+        $counts = WaterQualitySample::query()
+            ->select('statut', DB::raw('COUNT(*) as total'))
+            ->groupBy('statut')
+            ->pluck('total', 'statut');
+
+        $latest = WaterQualitySample::query()
+            ->orderByDesc('date_prelevement')
+            ->first(['date_prelevement']);
+
+        return [
+            'total' => (int) $counts->sum(),
+            'conformes' => (int) ($counts['conforme'] ?? 0),
+            'non_conformes' => (int) ($counts['non_conforme'] ?? 0),
+            'alertes_actives' => WaterQualityAlert::query()->where('statut', 'active')->count(),
+            'dernier_prelevement' => $latest?->date_prelevement,
+        ];
+    }
+
+    /**
+     * Mesures réelles des derniers prélèvements, paramètre par paramètre.
+     *
+     * @return list<array{parametre: string, label: string, unite: string, points: list<array{label: string, valeur: float, conforme: bool, seuil_min: float|null, seuil_max: float|null}>, min: float, max: float, seuil_min: float|null, seuil_max: float|null, dernier: array{label: string, valeur: float, conforme: bool, seuil_min: float|null, seuil_max: float|null}|null}>
+     */
+    public function parameterTrends(?Zone $zone = null, int $limit = 12): array
+    {
+        $samples = WaterQualitySample::query()
+            ->with('parameters')
+            ->when($zone, fn ($query) => $query->where('zone_id', $zone->id))
+            ->orderByDesc('date_prelevement')
+            ->limit(max(1, $limit))
+            ->get()
+            ->sortBy(fn (WaterQualitySample $sample) => $sample->date_prelevement?->getTimestamp() ?? 0)
+            ->values();
+
+        $series = [];
+
+        foreach ($samples as $sample) {
+            $date = $sample->date_prelevement?->format('d/m/Y') ?? '—';
+
+            foreach ($sample->parameters as $parameter) {
+                $code = (string) $parameter->parametre;
+
+                $series[$code] ??= [
+                    'parametre' => $code,
+                    'label' => QualityThreshold::PARAMETRES[$code] ?? ucfirst($code),
+                    'unite' => (string) $parameter->unite,
+                    'points' => [],
+                ];
+
+                if (filled($parameter->unite)) {
+                    $series[$code]['unite'] = (string) $parameter->unite;
+                }
+
+                $series[$code]['points'][] = [
+                    'label' => $date,
+                    'valeur' => (float) $parameter->valeur,
+                    'conforme' => (bool) $parameter->est_conforme,
+                    'seuil_min' => $parameter->seuil_min !== null ? (float) $parameter->seuil_min : null,
+                    'seuil_max' => $parameter->seuil_max !== null ? (float) $parameter->seuil_max : null,
+                ];
+            }
+        }
+
+        $ordered = [];
+
+        foreach (QualityThreshold::PARAMETRES as $code => $label) {
+            if (isset($series[$code])) {
+                $ordered[] = $this->finalizeTrend($series[$code]);
+                unset($series[$code]);
+            }
+        }
+
+        foreach ($series as $trend) {
+            $ordered[] = $this->finalizeTrend($trend);
+        }
+
+        return $ordered;
+    }
+
+    /**
+     * @param  array{parametre: string, label: string, unite: string, points: list<array{label: string, valeur: float, conforme: bool, seuil_min: float|null, seuil_max: float|null}>}  $trend
+     * @return array{parametre: string, label: string, unite: string, points: list<array{label: string, valeur: float, conforme: bool, seuil_min: float|null, seuil_max: float|null}>, min: float, max: float, seuil_min: float|null, seuil_max: float|null, dernier: array{label: string, valeur: float, conforme: bool, seuil_min: float|null, seuil_max: float|null}|null}
+     */
+    private function finalizeTrend(array $trend): array
+    {
+        $values = array_column($trend['points'], 'valeur');
+        $lastKey = array_key_last($trend['points']);
+
+        $seuilMin = null;
+        $seuilMax = null;
+
+        foreach (array_reverse($trend['points']) as $point) {
+            $seuilMin ??= $point['seuil_min'];
+            $seuilMax ??= $point['seuil_max'];
+
+            if ($seuilMin !== null && $seuilMax !== null) {
+                break;
+            }
+        }
+
+        $trend['min'] = $values === [] ? 0.0 : (float) min($values);
+        $trend['max'] = $values === [] ? 0.0 : (float) max($values);
+        $trend['seuil_min'] = $seuilMin;
+        $trend['seuil_max'] = $seuilMax;
+        $trend['dernier'] = $lastKey !== null ? $trend['points'][$lastKey] : null;
+
+        return $trend;
+    }
+
+    /**
+     * Prélèvements d'un périmètre, du plus ancien au plus récent, avec mesures et alertes.
+     *
+     * @return Collection<int, WaterQualitySample>
+     */
+    public function zoneHistory(Zone $zone, int $limit = 20): Collection
+    {
+        return WaterQualitySample::query()
+            ->where('zone_id', $zone->id)
+            ->with([
+                'parameters' => fn ($query) => $query->orderBy('id'),
+                'alerts',
+            ])
+            ->orderByDesc('date_prelevement')
+            ->limit(max(1, $limit))
+            ->get()
+            ->sortBy(fn (WaterQualitySample $sample) => $sample->date_prelevement?->getTimestamp() ?? 0)
+            ->values();
     }
 
     public function thresholdFor(WaterQualitySample $sample, string $parametre): ?QualityThreshold

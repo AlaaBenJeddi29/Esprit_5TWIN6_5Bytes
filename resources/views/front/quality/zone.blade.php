@@ -29,6 +29,15 @@
                 </div>
             </div>
 
+            {{-- Évolution des paramètres --}}
+            <div class="mb-8">
+                <div class="mb-4">
+                    <h2 class="text-xl font-bold text-dark dark:text-white">Évolution des paramètres</h2>
+                    <p class="mt-1 text-sm text-body-color dark:text-dark-6">Mesures réelles des derniers prélèvements de la zone, avec dates et unités.</p>
+                </div>
+                @include('front.quality.partials.trends', ['trends' => $trends])
+            </div>
+
             {{-- Alertes --}}
             @if ($alerts->isNotEmpty())
                 <div class="mb-8">

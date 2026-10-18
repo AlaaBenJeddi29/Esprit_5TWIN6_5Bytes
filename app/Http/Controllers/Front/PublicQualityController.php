@@ -63,6 +63,8 @@ class PublicQualityController extends Controller
             $sample->id => $this->analyzer->cachedSummary($sample),
         ]);
 
-        return view('front.quality.zone', compact('zone', 'summary', 'samples', 'alerts', 'aiSummaries'));
+        $trends = $this->analyzer->parameterTrends($zone);
+
+        return view('front.quality.zone', compact('zone', 'summary', 'samples', 'alerts', 'aiSummaries', 'trends'));
     }
 }

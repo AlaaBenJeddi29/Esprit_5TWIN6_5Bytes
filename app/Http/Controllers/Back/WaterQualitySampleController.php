@@ -17,6 +17,11 @@ use Illuminate\View\View;
 
 class WaterQualitySampleController extends Controller
 {
+    private const EVOLUTION_LIMIT = 20;
+
+    /** Fenêtre utilisée par QualityAnalyzer::zoneSummary() pour la tendance. */
+    private const TREND_WINDOW = 6;
+
     public function __construct(private readonly QualityAnalyzer $analyzer)
     {
     }
@@ -27,6 +32,8 @@ class WaterQualitySampleController extends Controller
         $statut = $request->string('statut')->toString();
         $zoneId = $request->integer('zone_id');
 
+        $zones = Zone::orderBy('nom')->get();
+
         $samples = WaterQualitySample::query()
             ->with(['zone', 'preleveur'])
             ->when($search !== '', fn ($query) => $query->where('reference', 'like', "%{$search}%"))
@@ -36,13 +43,35 @@ class WaterQualitySampleController extends Controller
             ->paginate(15)
             ->withQueryString();
 
+        $perimetreId = $request->integer('perimetre');
+        $perimetre = $perimetreId ? $zones->firstWhere('id', $perimetreId) : null;
+
+        $perimetreTrends = [];
+        $perimetreHistory = collect();
+        $perimetreSummary = null;
+        $trendDisponible = false;
+
+        if ($perimetre) {
+            $perimetreTrends = $this->analyzer->parameterTrends($perimetre, self::EVOLUTION_LIMIT);
+            $perimetreHistory = $this->analyzer->zoneHistory($perimetre, self::EVOLUTION_LIMIT);
+            $perimetreSummary = $this->analyzer->zoneSummary($perimetre);
+            $trendDisponible = $perimetreHistory->take(-self::TREND_WINDOW)->whereNotNull('score')->count() >= 3;
+        }
+
         return view('back.quality.samples.index', [
             'samples' => $samples,
             'statuts' => WaterQualitySample::STATUTS,
-            'zones' => Zone::orderBy('nom')->get(),
+            'zones' => $zones,
             'search' => $search,
             'currentStatut' => $statut,
             'currentZone' => $zoneId ?: null,
+            'stats' => $this->analyzer->statistics(),
+            'perimetre' => $perimetre,
+            'perimetreTrends' => $perimetreTrends,
+            'perimetreHistory' => $perimetreHistory,
+            'perimetreSummary' => $perimetreSummary,
+            'trendDisponible' => $trendDisponible,
+            'evolutionLimit' => self::EVOLUTION_LIMIT,
         ]);
     }
 
