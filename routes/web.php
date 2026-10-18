@@ -151,23 +151,35 @@ Route::middleware(['auth', 'verified', 'role:gestionnaire,admin'])
             ->parameters(['quality-alerts' => 'alert']);
 
         // Gestion 4 — Sécheresse, consommation et continuité de service
+        Route::get('water-levels/export/{format}', [WaterLevelController::class, 'export'])
+            ->name('water-levels.export');
         Route::resource('water-levels', WaterLevelController::class)
             ->names('water-levels')
             ->except(['show'])
             ->parameters(['water-levels' => 'level']);
+        
+        Route::get('consumption-readings/export/{format}', [ConsumptionReadingController::class, 'export'])
+            ->name('consumption-readings.export');
         Route::get('consumption-readings/previsions', [ConsumptionReadingController::class, 'forecast'])
             ->name('consumption-readings.forecast');
         Route::resource('consumption-readings', ConsumptionReadingController::class)
             ->names('consumption-readings')
             ->except(['show'])
             ->parameters(['consumption-readings' => 'reading']);
+        
+        Route::get('restrictions/export/{format}', [RestrictionController::class, 'export'])
+            ->name('restrictions.export');
         Route::resource('restrictions', RestrictionController::class)
             ->names('restrictions')
             ->except(['show']);
+        
+        Route::get('scheduled-cuts/export/{format}', [ScheduledCutController::class, 'export'])
+            ->name('scheduled-cuts.export');
         Route::resource('scheduled-cuts', ScheduledCutController::class)
             ->names('scheduled-cuts')
             ->except(['show'])
             ->parameters(['scheduled-cuts' => 'cut']);
+        
         Route::get('alert-subscriptions', [BackAlertSubscriptionController::class, 'index'])
             ->name('alert-subscriptions.index');
 

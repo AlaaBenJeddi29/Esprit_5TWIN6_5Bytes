@@ -1,0 +1,32 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "Install export dependencies (barryvdh/laravel-dompdf and maatwebsite/excel) and create a centralized DroughtExportService with shared logic for fetching filtered data and formatting for both PDF and Excel outputs. This service will handle data retrieval, respect all applied filters (zone_id, type_source, statut, etc.), and provide structured arrays for export generation.",
+  "status": "pending",
+  "steps": [
+    "Add barryvdh/laravel-dompdf ^1.0 and maatwebsite/excel ^3.1 to composer.json require section",
+    "Run composer install to install dependencies",
+    "Publish DomPDF config: php artisan vendor:publish --provider=Barryvdh\\DomPDF\\ServiceProvider",
+    "Create app/Services/Drought/DroughtExportService.php with static methods: getWaterLevelsForExport($zoneId, $type), getConsumptionReadingsForExport($zoneId), getRestrictionsForExport($zoneId, $statut, $type), getScheduledCutsForExport($zoneId, $statut). Each method returns a collection with eager-loaded relationships and formatted data.",
+    "Create app/Exports/Drought directory (if not exists)",
+    "Create app/Exports/Drought/WaterLevelExport.php implementing Maatwebsite\\Excel\\Concerns\\FromCollection; format: columns = [Source, Type, Zone, Level (%), Alert Threshold, Critical Threshold, Measured Date]; include headers with bold + blue background",
+    "Create app/Exports/Drought/ConsumptionReadingExport.php implementing same interface; columns = [Zone, Period, Consumption (m³), Subscribers, m³/Subscriber]; format numeric columns with thousand separators",
+    "Create app/Exports/Drought/RestrictionExport.php; columns = [Title, Level, Zone, Start Date, End Date, Status, Forbidden Uses]; format dates as dd/mm/yyyy hh:mm",
+    "Create app/Exports/Drought/ScheduledCutExport.php; columns = [Reason, Zone, Infrastructure, Start Date, End Date, Status]",
+    "All Export classes must apply SwitchLocale + WithEvents (to manage formatting), column widths (auto-sized), borders on all cells, alignment: headers centered, text left, numbers right"
+  ],
+  "acceptance_criteria": [
+    "Composer shows both packages installed: `composer show barryvdh/laravel-dompdf maatwebsite/excel`",
+    "config/dompdf.php exists and is published",
+    "DroughtExportService.php exists with 4 public static methods, each receiving appropriate filters and returning Illuminate\\Database\\Eloquent\\Collection",
+    "All 4 Export classes exist and implement FromCollection interface",
+    "Export classes apply bold headers, borders, and appropriate column widths"
+  ],
+  "verification": [
+    "php artisan config:cache (ensures config is correct)",
+    "Run: php artisan tinker && \\App\\Services\\Drought\\DroughtExportService::getWaterLevelsForExport(null, null) — should return a collection",
+    "Check app/Exports/Drought/*.php files exist with proper use statements"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

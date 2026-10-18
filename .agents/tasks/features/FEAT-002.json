@@ -1,0 +1,39 @@
+{
+  "id": "FEAT-002",
+  "type": "feat",
+  "description": "Implement export endpoints and UI: add export() methods to all 4 controllers (WaterLevelController, ConsumptionReadingController, RestrictionController, ScheduledCutController) to handle both PDF and Excel formats via query parameter ?format=pdf or ?format=excel. Create PDF view templates. Add 'Export PDF' and 'Export Excel' buttons to all 4 index views. Add routes for export endpoints. Filters must be passed through query parameters so export respects applied filters.",
+  "status": "pending",
+  "steps": [
+    "Add 4 routes to routes/web.php in the 'back' group: GET back/water-levels/export, back/consumption-readings/export, back/restrictions/export, back/scheduled-cuts/export — use route name export (e.g., back.water-levels.export)",
+    "Add export() method to WaterLevelController: accept Request, extract zone_id and type_source from query, call DroughtExportService::getWaterLevelsForExport(), render PDF if format=pdf (using dompdf) or return WaterLevelExport::download() if format=excel. File names: drought-water-levels-{date}.pdf or .xlsx",
+    "Add export() method to ConsumptionReadingController: same pattern, extract zone_id only, call DroughtExportService::getConsumptionReadingsForExport()",
+    "Add export() method to RestrictionController: extract zone_id, statut, type; call DroughtExportService::getRestrictionsForExport()",
+    "Add export() method to ScheduledCutController: extract zone_id, statut; call DroughtExportService::getScheduledCutsForExport()",
+    "Create resources/views/back/drought/exports/water-levels-pdf.blade.php: landscape orientation, header with 'Water Levels Report', export date, manager name (Auth::user()->name), table with all columns, page numbers in footer",
+    "Create resources/views/back/drought/exports/consumption-pdf.blade.php with same layout for consumption data",
+    "Create resources/views/back/drought/exports/restrictions-pdf.blade.php for restrictions",
+    "Create resources/views/back/drought/exports/scheduled-cuts-pdf.blade.php for cuts",
+    "Add 'Export PDF' and 'Export Excel' buttons to resources/views/back/drought/levels/index.blade.php above the table, preserving current filter parameters in URLs",
+    "Add same buttons to resources/views/back/drought/consumption/index.blade.php",
+    "Add same buttons to resources/views/back/drought/restrictions/index.blade.php",
+    "Add same buttons to resources/views/back/drought/cuts/index.blade.php"
+  ],
+  "acceptance_criteria": [
+    "All 4 export routes are defined in web.php and accessible (verified with `php artisan route:list | grep export`)",
+    "GET /back/water-levels/export?format=pdf returns a PDF file with Content-Type: application/pdf and correct filename",
+    "GET /back/water-levels/export?format=excel returns an Excel file with proper headers and formatting",
+    "PDF exports respect all filters: ?zone_id=1&type_source=barrage exports only that subset",
+    "Excel exports respect filters",
+    "Export buttons are visible on all 4 index pages",
+    "Clicking export buttons preserves current filter state in the export file"
+  ],
+  "verification": [
+    "php artisan test — all tests pass (no new failures)",
+    "Manual test each export route: curl 'http://localhost:8000/back/water-levels/export?format=pdf&zone_id=1' > /tmp/test.pdf && file /tmp/test.pdf (should show PDF)",
+    "Manual test Excel: curl 'http://localhost:8000/back/water-levels/export?format=excel' > /tmp/test.xlsx && file /tmp/test.xlsx (should show Microsoft Excel)",
+    "Open a browser to /back/water-levels, apply filter (e.g., zone_id=1), click 'Export PDF', verify downloaded file contains only zone 1 data",
+    "Repeat for Excel and all 4 tables"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

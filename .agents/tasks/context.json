@@ -1,0 +1,30 @@
+{
+  "project_type": "Laravel 12 monolith with Blade templating and MySQL",
+  "language": "PHP 8.2 + Blade",
+  "build_system": "Composer + npm",
+  "test_framework": "PHPUnit",
+  "build_command": "composer install && npm run build",
+  "test_command": "php artisan test",
+  "verification_instructions": "After each FEAT: run `php artisan test` to verify no regressions. Export routes must be accessible via GET and return PDF (Content-Type: application/pdf) or Excel (Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet). Manual test: visit /back/water-levels?zone_id=1&export=pdf to verify filters are respected.",
+  "snapshot_or_generated_files": "PDF and Excel files are generated dynamically in export methods; no committed snapshots needed.",
+  "environment_constraints": "DomPDF requires freetype/fontconfig (usually present on dev systems). Excel export via PhpSpreadsheet (part of maatwebsite/excel). Use temporary disk for file generation if needed.",
+  "contribution_requirements": "Follow existing code patterns: use dependency injection, maintain consistent naming (snake_case for routes, camelCase for methods), use Illuminate\\Http\\Response for file downloads, add query parameters to preserve filter state.",
+  "key_patterns": "Controllers use request()->integer() and request()->string() for filters; models use query builders with when() for conditional filtering; views pass filter state via route parameters; all filters are available in index() method.",
+  "relevant_files": [
+    "app/Http/Controllers/Back/WaterLevelController.php",
+    "app/Http/Controllers/Back/ConsumptionReadingController.php",
+    "app/Http/Controllers/Back/RestrictionController.php",
+    "app/Http/Controllers/Back/ScheduledCutController.php",
+    "app/Models/Drought/WaterLevel.php",
+    "app/Models/Drought/ConsumptionReading.php",
+    "app/Models/Drought/Restriction.php",
+    "app/Models/Drought/ScheduledCut.php",
+    "resources/views/back/drought/levels/index.blade.php",
+    "resources/views/back/drought/consumption/index.blade.php",
+    "resources/views/back/drought/restrictions/index.blade.php",
+    "resources/views/back/drought/cuts/index.blade.php",
+    "routes/web.php",
+    "composer.json"
+  ],
+  "directory_structure": "app/Http/Controllers/Back/ — controller layer; app/Models/Drought/ — Eloquent models; app/Services/ — business logic; app/Exports/ — (to be created) Excel export classes; resources/views/back/drought/ — Blade templates with exports/ subdirectory for PDF views; routes/web.php — route definitions"
+}

@@ -2,15 +2,21 @@
 
 namespace App\Http\Controllers\Back;
 
+use App\Exports\Drought\ConsumptionReadingExport;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Drought\StoreConsumptionReadingRequest;
 use App\Http\Requests\Drought\UpdateConsumptionReadingRequest;
 use App\Models\Drought\ConsumptionReading;
 use App\Models\Infrastructure\Zone;
+use App\Services\Drought\DroughtExportService;
 use App\Services\DroughtAnalyzer;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\View\View;
+use Maatwebsite\Excel\Facades\Excel;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class ConsumptionReadingController extends Controller
 {
@@ -91,6 +97,28 @@ class ConsumptionReadingController extends Controller
         return redirect()
             ->route('back.consumption-readings.index')
             ->with('success', 'Le relevé de consommation a été supprimé.');
+    }
+
+    /**
+     * Export consumption readings in PDF or Excel format.
+     */
+    public function export(Request $request): Response|BinaryFileResponse
+    {
+        $zoneId = $request->integer('zone_id') ?: null;
+        $format = $request->string('format')->toString() ?: 'pdf';
+
+        $readings = DroughtExportService::getConsumptionReadingsForExport($zoneId);
+
+        if ($format === 'excel') {
+            return Excel::download(
+                new ConsumptionReadingExport($readings),
+                'drought-consumption-readings-' . now()->format('Ymd-His') . '.xlsx'
+            );
+        }
+
+        return Pdf::loadView('back.drought.exports.consumption-pdf', ['readings' => $readings])
+            ->setPaper('a4', 'landscape')
+            ->download('drought-consumption-readings-' . now()->format('Ymd-His') . '.pdf');
     }
 
     /**

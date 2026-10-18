@@ -1,0 +1,7 @@
+{
+  "task_id": "task-drought-export",
+  "task_description": "Implement PDF and Excel export functionality for Drought Management (Gestion 4) — Water Levels, Consumption Readings, Restrictions, and Scheduled Cuts tables with respected filters",
+  "status": "pending",
+  "feature_order": ["FEAT-001", "FEAT-002"],
+  "blocked_reason": null
+}

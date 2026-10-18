@@ -32,6 +32,8 @@
             @endforeach
         </select>
         <button type="submit" class="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">Filtrer</button>
+        <a href="{{ route('back.water-levels.export', array_merge(request()->only(['zone_id', 'type_source']), ['format' => 'pdf'])) }}" class="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">📄 Exporter PDF</a>
+        <a href="{{ route('back.water-levels.export', array_merge(request()->only(['zone_id', 'type_source']), ['format' => 'excel'])) }}" class="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">📊 Exporter Excel</a>
     </form>
 
     <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">

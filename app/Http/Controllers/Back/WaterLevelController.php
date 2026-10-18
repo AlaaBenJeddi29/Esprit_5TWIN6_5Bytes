@@ -2,14 +2,20 @@
 
 namespace App\Http\Controllers\Back;
 
+use App\Exports\Drought\WaterLevelExport;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Drought\StoreWaterLevelRequest;
 use App\Http\Requests\Drought\UpdateWaterLevelRequest;
 use App\Models\Drought\WaterLevel;
 use App\Models\Infrastructure\Zone;
+use App\Services\Drought\DroughtExportService;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\View\View;
+use Maatwebsite\Excel\Facades\Excel;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class WaterLevelController extends Controller
 {
@@ -80,6 +86,29 @@ class WaterLevelController extends Controller
         return redirect()
             ->route('back.water-levels.index')
             ->with('success', 'La mesure de niveau a été supprimée.');
+    }
+
+    /**
+     * Export water levels in PDF or Excel format.
+     */
+    public function export(Request $request): Response|BinaryFileResponse
+    {
+        $zoneId = $request->integer('zone_id') ?: null;
+        $type = $request->string('type_source')->toString() ?: null;
+        $format = $request->string('format')->toString() ?: 'pdf';
+
+        $levels = DroughtExportService::getWaterLevelsForExport($zoneId, $type);
+
+        if ($format === 'excel') {
+            return Excel::download(
+                new WaterLevelExport($levels),
+                'drought-water-levels-' . now()->format('Ymd-His') . '.xlsx'
+            );
+        }
+
+        return Pdf::loadView('back.drought.exports.water-levels-pdf', ['levels' => $levels])
+            ->setPaper('a4', 'landscape')
+            ->download('drought-water-levels-' . now()->format('Ymd-His') . '.pdf');
     }
 
     /**

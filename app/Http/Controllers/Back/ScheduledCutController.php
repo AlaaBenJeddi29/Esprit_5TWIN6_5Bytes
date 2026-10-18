@@ -2,15 +2,21 @@
 
 namespace App\Http\Controllers\Back;
 
+use App\Exports\Drought\ScheduledCutExport;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Drought\StoreScheduledCutRequest;
 use App\Http\Requests\Drought\UpdateScheduledCutRequest;
 use App\Models\Drought\ScheduledCut;
 use App\Models\Infrastructure\Infrastructure;
 use App\Models\Infrastructure\Zone;
+use App\Services\Drought\DroughtExportService;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\View\View;
+use Maatwebsite\Excel\Facades\Excel;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class ScheduledCutController extends Controller
 {
@@ -75,6 +81,29 @@ class ScheduledCutController extends Controller
         return redirect()
             ->route('back.scheduled-cuts.index')
             ->with('success', 'La coupure programmée a été supprimée.');
+    }
+
+    /**
+     * Export scheduled cuts in PDF or Excel format.
+     */
+    public function export(Request $request): Response|BinaryFileResponse
+    {
+        $zoneId = $request->integer('zone_id') ?: null;
+        $statut = $request->string('statut')->toString() ?: null;
+        $format = $request->string('format')->toString() ?: 'pdf';
+
+        $cuts = DroughtExportService::getScheduledCutsForExport($zoneId, $statut);
+
+        if ($format === 'excel') {
+            return Excel::download(
+                new ScheduledCutExport($cuts),
+                'drought-scheduled-cuts-' . now()->format('Ymd-His') . '.xlsx'
+            );
+        }
+
+        return Pdf::loadView('back.drought.exports.scheduled-cuts-pdf', ['cuts' => $cuts])
+            ->setPaper('a4', 'landscape')
+            ->download('drought-scheduled-cuts-' . now()->format('Ymd-His') . '.pdf');
     }
 
     /**
