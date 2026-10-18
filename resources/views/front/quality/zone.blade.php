@@ -63,6 +63,25 @@
                             </summary>
 
                             <div class="border-t border-stroke px-6 py-4 dark:border-dark-3">
+                                @php $aiSummary = $aiSummaries[$sample->id] ?? null; @endphp
+
+                                @if ($aiSummary)
+                                    <div class="mb-4 rounded-md border border-blue-100 bg-blue-50/60 p-4 dark:border-dark-3 dark:bg-dark-3/40">
+                                        <p class="text-xs font-semibold uppercase text-primary">Analyse intelligente de la qualité de l'eau</p>
+                                        <p class="mt-2 text-sm text-body-color dark:text-dark-6">{{ $aiSummary['resume'] }}</p>
+
+                                        @if (! empty($aiSummary['anomalies']))
+                                            <ul class="mt-3 space-y-1 text-xs text-body-color dark:text-dark-6">
+                                                @foreach ($aiSummary['anomalies'] as $anomaly)
+                                                    <li>• {{ $anomaly }}</li>
+                                                @endforeach
+                                            </ul>
+                                        @else
+                                            <p class="mt-2 text-xs text-body-color dark:text-dark-6">Aucune anomalie détectée par l'analyse intelligente.</p>
+                                        @endif
+                                    </div>
+                                @endif
+
                                 @if ($sample->parameters->isNotEmpty())
                                     <div class="overflow-x-auto">
                                         <table class="w-full text-sm">

@@ -38,6 +38,39 @@
                 @endif
             </div>
 
+            <div class="rounded-2xl border border-brand-200 bg-brand-50/40 p-5 dark:border-brand-500/20 dark:bg-brand-500/[0.06] md:p-6">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <h2 class="text-base font-medium text-gray-800 dark:text-white/90">Analyse intelligente de la qualité de l'eau</h2>
+                    <span class="inline-flex rounded-full bg-brand-100 px-2.5 py-0.5 text-[10px] font-medium uppercase text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">Gemini</span>
+                </div>
+
+                @if ($aiSummary)
+                    <p class="mt-3 whitespace-pre-line text-sm leading-relaxed text-gray-600 dark:text-gray-300">{{ $aiSummary['resume'] }}</p>
+
+                    <div class="mt-4">
+                        <h3 class="text-sm font-medium text-gray-800 dark:text-white/90">Anomalies détectées</h3>
+                        @if (! empty($aiSummary['anomalies']))
+                            <ul class="mt-2 space-y-1.5 text-sm text-gray-600 dark:text-gray-300">
+                                @foreach ($aiSummary['anomalies'] as $anomaly)
+                                    <li class="flex gap-2">
+                                        <span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-brand-500"></span>
+                                        <span>{{ $anomaly }}</span>
+                                    </li>
+                                @endforeach
+                            </ul>
+                        @else
+                            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Aucune anomalie détectée par l'analyse intelligente.</p>
+                        @endif
+                    </div>
+
+                    @if ($aiSummary['genere_le'])
+                        <p class="mt-4 text-[11px] text-gray-400">Résumé généré automatiquement le {{ $aiSummary['genere_le'] }}. Il complète l'analyse des seuils sans la remplacer.</p>
+                    @endif
+                @else
+                    <p class="mt-3 text-sm text-gray-500 dark:text-gray-400">Le résumé intelligent n'est pas disponible pour ce prélèvement. L'analyse automatique des seuils et les alertes restent affichées ci-dessous.</p>
+                @endif
+            </div>
+
             <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
                 <div class="border-b border-gray-100 px-5 py-4 dark:border-gray-800 md:px-6">
                     <h2 class="text-base font-medium text-gray-800 dark:text-white/90">Résultats par paramètre</h2>

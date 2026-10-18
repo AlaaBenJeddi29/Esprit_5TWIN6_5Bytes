@@ -71,7 +71,10 @@ class WaterQualitySampleController extends Controller
     {
         $sample->load(['zone', 'infrastructure', 'preleveur', 'parameters', 'alerts']);
 
-        return view('back.quality.samples.show', compact('sample'));
+        return view('back.quality.samples.show', [
+            'sample' => $sample,
+            'aiSummary' => $this->analyzer->cachedSummary($sample),
+        ]);
     }
 
     public function edit(WaterQualitySample $sample): View

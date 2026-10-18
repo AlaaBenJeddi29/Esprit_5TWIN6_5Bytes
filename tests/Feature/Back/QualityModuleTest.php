@@ -8,16 +8,47 @@ use App\Models\Quality\WaterQualityAlert;
 use App\Models\Quality\WaterQualityParameter;
 use App\Models\Quality\WaterQualitySample;
 use App\Models\User;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class QualityModuleTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        config(['services.gemini.api_key' => 'test-gemini-key']);
+        Http::preventStrayRequests();
+    }
+
     private function gestionnaire(): User
     {
         return User::factory()->gestionnaire()->create();
+    }
+
+    /**
+     * @param  list<string>  $anomalies
+     */
+    private function fakeGeminiSummary(string $resume, array $anomalies = []): void
+    {
+        Http::fake([
+            'generativelanguage.googleapis.com/*' => Http::response([
+                'candidates' => [[
+                    'content' => [
+                        'parts' => [[
+                            'text' => json_encode([
+                                'resume' => $resume,
+                                'anomalies' => $anomalies,
+                            ], JSON_UNESCAPED_UNICODE),
+                        ]],
+                    ],
+                ]],
+            ]),
+        ]);
     }
 
     public function test_citizen_cannot_access_quality_back_office(): void
@@ -207,5 +238,211 @@ class QualityModuleTest extends TestCase
 
         $this->get(route('public.quality.index'))->assertOk()->assertSee('Zone Publique');
         $this->get(route('public.quality.zone', $zone))->assertOk()->assertSee('Zone Publique');
+    }
+
+    public function test_ai_detects_anomalies_and_writes_a_citizen_summary(): void
+    {
+        $gestionnaire = $this->gestionnaire();
+        $zone = Zone::factory()->create(['nom' => 'Zone Centre']);
+
+        QualityThreshold::factory()->create([
+            'zone_id' => $zone->id,
+            'parametre' => 'turbidite',
+            'unite' => 'NTU',
+            'valeur_min' => 0,
+            'valeur_max' => 5,
+        ]);
+
+        $this->fakeGeminiSummary(
+            "La turbidité mesurée est supérieure au seuil autorisé. Une vérification par les responsables est recommandée.",
+            ['Turbidité élevée : 9,5 NTU pour un maximum de 5 NTU.'],
+        );
+
+        $this->actingAs($gestionnaire)->post(route('back.quality-samples.store'), [
+            'zone_id' => $zone->id,
+            'date_prelevement' => now()->format('Y-m-d H:i:s'),
+            'parametres' => [
+                'ph' => ['valeur' => 7.2],
+                'turbidite' => ['valeur' => 9.5],
+            ],
+        ])->assertRedirect();
+
+        $sample = WaterQualitySample::firstOrFail();
+
+        Http::assertSent(function ($request) {
+            $prompt = $request['contents'][0]['parts'][0]['text'] ?? '';
+
+            return str_contains($request->url(), 'gemini-2.5-flash')
+                && $request->hasHeader('x-goog-api-key', 'test-gemini-key')
+                && str_contains($prompt, 'Turbidité')
+                && str_contains($prompt, '"valeur": 9.5')
+                && str_contains($prompt, '"seuil_max": 5')
+                && str_contains($prompt, '"origine_seuil": "base_de_donnees"');
+        });
+
+        $response = $this->actingAs($gestionnaire)
+            ->get(route('back.quality-samples.show', $sample));
+
+        $response->assertOk()
+            ->assertSee('Analyse intelligente de la qualité de l\'eau', false)
+            ->assertSee('La turbidité mesurée est supérieure au seuil autorisé.')
+            ->assertSee('Turbidité élevée : 9,5 NTU pour un maximum de 5 NTU.');
+    }
+
+    public function test_ai_summary_states_when_no_anomaly_is_detected(): void
+    {
+        $gestionnaire = $this->gestionnaire();
+        $zone = Zone::factory()->create();
+
+        QualityThreshold::factory()->create([
+            'zone_id' => $zone->id,
+            'parametre' => 'ph',
+            'unite' => 'pH',
+            'valeur_min' => 6.5,
+            'valeur_max' => 8.5,
+        ]);
+
+        $this->fakeGeminiSummary(
+            "Les paramètres mesurés respectent les seuils configurés. Aucune anomalie n'a été détectée lors de ce contrôle.",
+        );
+
+        $this->actingAs($gestionnaire)->post(route('back.quality-samples.store'), [
+            'zone_id' => $zone->id,
+            'date_prelevement' => now()->format('Y-m-d H:i:s'),
+            'parametres' => [
+                'ph' => ['valeur' => 7.2],
+            ],
+        ])->assertRedirect();
+
+        $sample = WaterQualitySample::firstOrFail();
+
+        $this->actingAs($gestionnaire)
+            ->get(route('back.quality-samples.show', $sample))
+            ->assertOk()
+            ->assertSee('Les paramètres mesurés respectent les seuils configurés.')
+            ->assertSee('Aucune anomalie détectée par l\'analyse intelligente.', false);
+    }
+
+    public function test_analysis_continues_when_gemini_is_unavailable(): void
+    {
+        Http::fake([
+            'generativelanguage.googleapis.com/*' => Http::response('Service unavailable', 503),
+        ]);
+
+        $gestionnaire = $this->gestionnaire();
+        $zone = Zone::factory()->create();
+
+        $this->actingAs($gestionnaire)->post(route('back.quality-samples.store'), [
+            'zone_id' => $zone->id,
+            'date_prelevement' => now()->format('Y-m-d H:i:s'),
+            'parametres' => [
+                'turbidite' => ['valeur' => 9.5],
+            ],
+        ])->assertRedirect();
+
+        $sample = WaterQualitySample::firstOrFail();
+
+        $this->assertSame('non_conforme', $sample->statut);
+        $this->assertDatabaseHas('water_quality_alerts', [
+            'sample_id' => $sample->id,
+            'parametre' => 'turbidite',
+            'statut' => 'active',
+        ]);
+
+        $this->actingAs($gestionnaire)
+            ->get(route('back.quality-samples.show', $sample))
+            ->assertOk()
+            ->assertSee("Le résumé intelligent n'est pas disponible pour ce prélèvement.", false);
+    }
+
+    public function test_analysis_continues_when_gemini_times_out(): void
+    {
+        Http::fake(fn () => throw new ConnectionException('Timeout simulé.'));
+
+        $gestionnaire = $this->gestionnaire();
+        $zone = Zone::factory()->create();
+
+        $this->actingAs($gestionnaire)->post(route('back.quality-samples.store'), [
+            'zone_id' => $zone->id,
+            'date_prelevement' => now()->format('Y-m-d H:i:s'),
+            'parametres' => [
+                'turbidite' => ['valeur' => 9.5],
+            ],
+        ])->assertRedirect();
+
+        $sample = WaterQualitySample::firstOrFail();
+
+        $this->assertSame('non_conforme', $sample->statut);
+        $this->assertSame(1, WaterQualityAlert::where('sample_id', $sample->id)->count());
+    }
+
+    public function test_analysis_continues_when_gemini_returns_invalid_json(): void
+    {
+        Http::fake([
+            'generativelanguage.googleapis.com/*' => Http::response([
+                'candidates' => [[
+                    'content' => ['parts' => [['text' => 'réponse non json']]],
+                ]],
+            ]),
+        ]);
+
+        $gestionnaire = $this->gestionnaire();
+        $zone = Zone::factory()->create();
+
+        $this->actingAs($gestionnaire)->post(route('back.quality-samples.store'), [
+            'zone_id' => $zone->id,
+            'date_prelevement' => now()->format('Y-m-d H:i:s'),
+            'parametres' => [
+                'ph' => ['valeur' => 7.2],
+            ],
+        ])->assertRedirect();
+
+        $sample = WaterQualitySample::firstOrFail();
+
+        $this->actingAs($gestionnaire)
+            ->get(route('back.quality-samples.show', $sample))
+            ->assertOk()
+            ->assertSee("Le résumé intelligent n'est pas disponible pour ce prélèvement.", false);
+    }
+
+    public function test_repeated_analysis_does_not_duplicate_active_alerts_or_api_calls(): void
+    {
+        $gestionnaire = $this->gestionnaire();
+        $zone = Zone::factory()->create();
+
+        QualityThreshold::factory()->create([
+            'zone_id' => $zone->id,
+            'parametre' => 'turbidite',
+            'unite' => 'NTU',
+            'valeur_min' => 0,
+            'valeur_max' => 5,
+        ]);
+
+        $this->fakeGeminiSummary('Une vérification est recommandée.', ['Turbidité élevée.']);
+
+        $payload = [
+            'zone_id' => $zone->id,
+            'date_prelevement' => now()->format('Y-m-d H:i:s'),
+            'parametres' => [
+                'turbidite' => ['valeur' => 9.5],
+            ],
+        ];
+
+        $this->actingAs($gestionnaire)
+            ->post(route('back.quality-samples.store'), $payload)
+            ->assertRedirect();
+
+        $sample = WaterQualitySample::firstOrFail();
+
+        $this->assertSame(1, WaterQualityAlert::where('sample_id', $sample->id)->where('statut', 'active')->count());
+        Http::assertSentCount(1);
+
+        $this->actingAs($gestionnaire)
+            ->put(route('back.quality-samples.update', $sample), $payload)
+            ->assertRedirect();
+
+        $this->assertSame(1, WaterQualityAlert::where('sample_id', $sample->id)->where('statut', 'active')->count());
+        $this->assertSame(1, WaterQualityParameter::where('sample_id', $sample->id)->count());
+        Http::assertSentCount(1);
     }
 }
