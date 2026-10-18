@@ -51,7 +51,32 @@
       "Bash(php artisan test tests/Feature/Back/IncidentWorkflowTest.php tests/Feature/Back/IncidentModuleTest.php 2>&1 | tail -25)",
       "Bash(php artisan view:cache 2>&1 | tail -3 && php artisan test tests/Feature/Back/IncidentWorkflowTest.php tests/Feature/Back/IncidentModuleTest.php 2>&1 | tail -6)",
       "Bash(php artisan test 2>&1 | tail -15)",
-      "Bash(php artisan migrate:status 2>&1 | grep -E \"workflow|Ran|Pending\" | tail -3)"
+      "Bash(php artisan migrate:status 2>&1 | grep -E \"workflow|Ran|Pending\" | tail -3)",
+      "Bash(ls node_modules/leaflet 2>/dev/null | head -5; echo \"---\"; grep -rn \"leaflet\" resources/ --include=\"*.js\" --include=\"*.css\" --include=\"*.blade.php\" -i | head -20; echo \"---routes---\"; ls routes)",
+      "Bash(ls app/Policies app/Http/Requests/Incident 2>/dev/null; echo \"---\"; grep -rn \"Incident\" app/Policies 2>/dev/null | head -20; echo \"---gates---\"; grep -rn \"Gate::\" app/Providers | head)",
+      "Bash(ls database/factories database/factories/Incident 2>/dev/null; echo \"---tests---\"; ls tests/Feature/Back | head -30; echo \"---phpunit---\"; grep -n \"DB_\\\\|DATABASE\" phpunit.xml)",
+      "Bash(sed -n '1,60p' app/Models/User.php; echo \"---middleware role---\"; grep -rn \"role\" bootstrap/app.php app/Http/Middleware 2>/dev/null | head -20)",
+      "Bash(sed -n '1,120p' config/aquasecure.php; echo \"---forecast---\"; grep -n \"forecast\" -A 40 app/Http/Controllers/Back/ConsumptionReadingController.php | head -60; echo \"---gateway---\"; grep -n \"canAccessBackOffice\\\\|isGestionnaire\\\\|isAdmin\" app/Models/User.php)",
+      "Bash(php artisan view:cache 2>&1 | tail -3; php artisan route:list --path=incidents 2>&1 | head -25)",
+      "Bash(php artisan test tests/Feature/Back/IncidentMapTest.php 2>&1 | tail -50)",
+      "Bash(npm run build 2>&1 | tail -25)",
+      "Bash(php artisan test tests/Feature/Back/IncidentMapTest.php tests/Feature/Back/IncidentWorkflowTest.php tests/Feature/Back/IncidentModuleTest.php 2>&1 | tail -8)",
+      "Bash(php artisan test 2>&1 | tail -20)",
+      "Bash(php artisan test tests/Feature/Front/PublicAndCitizenTest.php --filter=citizen_can_make_a_simulated_donation 2>&1 | tail -25)",
+      "Bash(grep -n \"donate\" -A 35 app/Http/Controllers/Front/ProjectController.php | head -60; echo \"---test setup---\"; sed -n '1,60p' tests/Feature/Front/PublicAndCitizenTest.php)",
+      "Bash(grep -n \"statut\" database/factories/Project/ProjectFactory.php; echo \"---infra failure baseline---\"; php artisan test tests/Feature/Back/InfrastructureModuleTest.php --filter=deleting_zone_cascades 2>&1 | tail -8)",
+      "Bash(php artisan test 2>&1 | tail -8)",
+      "Bash(ls vendor/bin/pint 2>/dev/null && vendor/bin/pint --test app/Services/IncidentClusterService.php app/Http/Controllers/Back/IncidentMapController.php app/Http/Requests/Incident/IncidentMapFilterRequest.php tests/Feature/Back/IncidentMapTest.php config/aquasecure.php routes/web.php 2>&1 | tail -20)",
+      "Bash(vendor/bin/pint app/Http/Controllers/Back/IncidentMapController.php app/Services/IncidentClusterService.php app/Http/Requests/Incident/IncidentMapFilterRequest.php tests/Feature/Back/IncidentMapTest.php 2>&1 | tail -10)",
+      "Bash(vendor/bin/pint --test -v routes/web.php 2>&1 | head -40)",
+      "Bash(php artisan test tests/Feature/Back/IncidentMapTest.php 2>&1 | tail -5; php artisan view:cache 2>&1 | tail -2)",
+      "Bash(npm run build 2>&1 | tail -8)",
+      "Bash(php artisan test tests/Feature/Back/IncidentMapTest.php 2>&1 | grep -A 20 \"FAILED\\\\|⨯\")",
+      "Bash(php artisan test tests/Feature/Back/IncidentMapTest.php 2>&1 | tail -4)",
+      "Bash(php artisan test 2>&1 | tail -6)",
+      "Bash(vendor/bin/pint --test app/Services/IncidentClusterService.php app/Http/Controllers/Back/IncidentMapController.php app/Http/Requests/Incident/IncidentMapFilterRequest.php tests/Feature/Back/IncidentMapTest.php 2>&1 | tail -6)",
+      "Bash(php artisan test 2>&1 | grep -E \"FAILED|Tests:\" | head -10)",
+      "Bash(git status --short | head -40; echo \"---diff stat---\"; git diff --stat | tail -15)"
     ]
   }
 }

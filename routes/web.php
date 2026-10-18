@@ -8,6 +8,7 @@ use App\Http\Controllers\Back\DashboardController;
 use App\Http\Controllers\Back\FundingController;
 use App\Http\Controllers\Back\GestionnaireController;
 use App\Http\Controllers\Back\IncidentController as BackIncidentController;
+use App\Http\Controllers\Back\IncidentMapController;
 use App\Http\Controllers\Back\InfrastructureController;
 use App\Http\Controllers\Back\MaintenanceController;
 use App\Http\Controllers\Back\ProjectController;
@@ -132,6 +133,10 @@ Route::middleware(['auth', 'verified', 'role:gestionnaire,admin'])
         Route::resource('maintenances', MaintenanceController::class)->names('maintenances');
 
         // Gestion 2 — Incidents
+        // Déclarées AVANT la ressource pour que « map » ne soit pas capturé
+        // par la route incidents.show ({incident}).
+        Route::get('incidents/map', [IncidentMapController::class, 'index'])->name('incidents.map');
+        Route::get('incidents/map/data', [IncidentMapController::class, 'data'])->name('incidents.map.data');
         Route::resource('incidents', BackIncidentController::class)->names('incidents');
         Route::patch('incidents/{incident}/statut', [BackIncidentController::class, 'updateStatus'])
             ->name('incidents.status');
