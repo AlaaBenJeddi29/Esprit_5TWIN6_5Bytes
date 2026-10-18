@@ -59,6 +59,12 @@ class PublicQualityController extends Controller
             ->latest()
             ->get();
 
-        return view('front.quality.zone', compact('zone', 'summary', 'samples', 'alerts'));
+        $aiSummaries = $samples->mapWithKeys(fn (WaterQualitySample $sample) => [
+            $sample->id => $this->analyzer->cachedSummary($sample),
+        ]);
+
+        $trends = $this->analyzer->parameterTrends($zone);
+
+        return view('front.quality.zone', compact('zone', 'summary', 'samples', 'alerts', 'aiSummaries', 'trends'));
     }
 }

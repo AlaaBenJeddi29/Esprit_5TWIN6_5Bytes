@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -n '\"guzzlehttp/guzzle\"' composer.lock | head -3; ls -d vendor/guzzlehttp/guzzle 2>/dev/null && echo GUZZLE_PRESENT || echo GUZZLE_MISSING; php -m | grep -i '^curl$')"
+    ]
+  }
+}

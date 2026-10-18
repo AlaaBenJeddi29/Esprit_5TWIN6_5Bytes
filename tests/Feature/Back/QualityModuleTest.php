@@ -8,16 +8,50 @@ use App\Models\Quality\WaterQualityAlert;
 use App\Models\Quality\WaterQualityParameter;
 use App\Models\Quality\WaterQualitySample;
 use App\Models\User;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class QualityModuleTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        config([
+            'services.gemini.api_key' => 'test-gemini-key',
+            'services.gemini.model' => 'gemini-3.5-flash-lite',
+        ]);
+        Http::preventStrayRequests();
+    }
+
     private function gestionnaire(): User
     {
         return User::factory()->gestionnaire()->create();
+    }
+
+    /**
+     * @param  list<string>  $anomalies
+     */
+    private function fakeGeminiSummary(string $resume, array $anomalies = []): void
+    {
+        Http::fake([
+            'generativelanguage.googleapis.com/*' => Http::response([
+                'candidates' => [[
+                    'content' => [
+                        'parts' => [[
+                            'text' => json_encode([
+                                'resume' => $resume,
+                                'anomalies' => $anomalies,
+                            ], JSON_UNESCAPED_UNICODE),
+                        ]],
+                    ],
+                ]],
+            ]),
+        ]);
     }
 
     public function test_citizen_cannot_access_quality_back_office(): void
@@ -207,5 +241,499 @@ class QualityModuleTest extends TestCase
 
         $this->get(route('public.quality.index'))->assertOk()->assertSee('Zone Publique');
         $this->get(route('public.quality.zone', $zone))->assertOk()->assertSee('Zone Publique');
+    }
+
+    public function test_ai_detects_anomalies_and_writes_a_citizen_summary(): void
+    {
+        $gestionnaire = $this->gestionnaire();
+        $zone = Zone::factory()->create(['nom' => 'Zone Centre']);
+
+        QualityThreshold::factory()->create([
+            'zone_id' => $zone->id,
+            'parametre' => 'turbidite',
+            'unite' => 'NTU',
+            'valeur_min' => 0,
+            'valeur_max' => 5,
+        ]);
+
+        $this->fakeGeminiSummary(
+            "La turbidité mesurée est supérieure au seuil autorisé. Une vérification par les responsables est recommandée.",
+            ['Turbidité élevée : 9,5 NTU pour un maximum de 5 NTU.'],
+        );
+
+        $this->actingAs($gestionnaire)->post(route('back.quality-samples.store'), [
+            'zone_id' => $zone->id,
+            'date_prelevement' => now()->format('Y-m-d H:i:s'),
+            'parametres' => [
+                'ph' => ['valeur' => 7.2],
+                'turbidite' => ['valeur' => 9.5],
+            ],
+        ])->assertRedirect();
+
+        $sample = WaterQualitySample::firstOrFail();
+
+        Http::assertSent(function ($request) {
+            $prompt = $request['contents'][0]['parts'][0]['text'] ?? '';
+
+            return str_contains($request->url(), (string) config('services.gemini.model'))
+                && $request->hasHeader('x-goog-api-key', 'test-gemini-key')
+                && str_contains($prompt, 'Turbidité')
+                && str_contains($prompt, '"valeur": 9.5')
+                && str_contains($prompt, '"seuil_max": 5')
+                && str_contains($prompt, '"origine_seuil": "base_de_donnees"');
+        });
+
+        $response = $this->actingAs($gestionnaire)
+            ->get(route('back.quality-samples.show', $sample));
+
+        $response->assertOk()
+            ->assertSee('Analyse intelligente de la qualité de l\'eau', false)
+            ->assertSee('La turbidité mesurée est supérieure au seuil autorisé.')
+            ->assertSee('Turbidité élevée : 9,5 NTU pour un maximum de 5 NTU.');
+    }
+
+    public function test_ai_summary_states_when_no_anomaly_is_detected(): void
+    {
+        $gestionnaire = $this->gestionnaire();
+        $zone = Zone::factory()->create();
+
+        QualityThreshold::factory()->create([
+            'zone_id' => $zone->id,
+            'parametre' => 'ph',
+            'unite' => 'pH',
+            'valeur_min' => 6.5,
+            'valeur_max' => 8.5,
+        ]);
+
+        $this->fakeGeminiSummary(
+            "Les paramètres mesurés respectent les seuils configurés. Aucune anomalie n'a été détectée lors de ce contrôle.",
+        );
+
+        $this->actingAs($gestionnaire)->post(route('back.quality-samples.store'), [
+            'zone_id' => $zone->id,
+            'date_prelevement' => now()->format('Y-m-d H:i:s'),
+            'parametres' => [
+                'ph' => ['valeur' => 7.2],
+            ],
+        ])->assertRedirect();
+
+        $sample = WaterQualitySample::firstOrFail();
+
+        $this->actingAs($gestionnaire)
+            ->get(route('back.quality-samples.show', $sample))
+            ->assertOk()
+            ->assertSee('Les paramètres mesurés respectent les seuils configurés.')
+            ->assertSee('Aucune anomalie détectée par l\'analyse intelligente.', false);
+    }
+
+    public function test_analysis_continues_when_gemini_is_unavailable(): void
+    {
+        Http::fake([
+            'generativelanguage.googleapis.com/*' => Http::response('Service unavailable', 503),
+        ]);
+
+        $gestionnaire = $this->gestionnaire();
+        $zone = Zone::factory()->create();
+
+        $this->actingAs($gestionnaire)->post(route('back.quality-samples.store'), [
+            'zone_id' => $zone->id,
+            'date_prelevement' => now()->format('Y-m-d H:i:s'),
+            'parametres' => [
+                'turbidite' => ['valeur' => 9.5],
+            ],
+        ])->assertRedirect();
+
+        $sample = WaterQualitySample::firstOrFail();
+
+        $this->assertSame('non_conforme', $sample->statut);
+        $this->assertDatabaseHas('water_quality_alerts', [
+            'sample_id' => $sample->id,
+            'parametre' => 'turbidite',
+            'statut' => 'active',
+        ]);
+
+        $this->actingAs($gestionnaire)
+            ->get(route('back.quality-samples.show', $sample))
+            ->assertOk()
+            ->assertSee("Le résumé intelligent n'est pas disponible pour ce prélèvement.", false);
+    }
+
+    public function test_analysis_continues_when_gemini_times_out(): void
+    {
+        Http::fake(fn () => throw new ConnectionException('Timeout simulé.'));
+
+        $gestionnaire = $this->gestionnaire();
+        $zone = Zone::factory()->create();
+
+        $this->actingAs($gestionnaire)->post(route('back.quality-samples.store'), [
+            'zone_id' => $zone->id,
+            'date_prelevement' => now()->format('Y-m-d H:i:s'),
+            'parametres' => [
+                'turbidite' => ['valeur' => 9.5],
+            ],
+        ])->assertRedirect();
+
+        $sample = WaterQualitySample::firstOrFail();
+
+        $this->assertSame('non_conforme', $sample->statut);
+        $this->assertSame(1, WaterQualityAlert::where('sample_id', $sample->id)->count());
+    }
+
+    public function test_analysis_continues_when_gemini_returns_invalid_json(): void
+    {
+        Http::fake([
+            'generativelanguage.googleapis.com/*' => Http::response([
+                'candidates' => [[
+                    'content' => ['parts' => [['text' => 'réponse non json']]],
+                ]],
+            ]),
+        ]);
+
+        $gestionnaire = $this->gestionnaire();
+        $zone = Zone::factory()->create();
+
+        $this->actingAs($gestionnaire)->post(route('back.quality-samples.store'), [
+            'zone_id' => $zone->id,
+            'date_prelevement' => now()->format('Y-m-d H:i:s'),
+            'parametres' => [
+                'ph' => ['valeur' => 7.2],
+            ],
+        ])->assertRedirect();
+
+        $sample = WaterQualitySample::firstOrFail();
+
+        $this->actingAs($gestionnaire)
+            ->get(route('back.quality-samples.show', $sample))
+            ->assertOk()
+            ->assertSee("Le résumé intelligent n'est pas disponible pour ce prélèvement.", false);
+    }
+
+    public function test_repeated_analysis_does_not_duplicate_active_alerts_or_api_calls(): void
+    {
+        $gestionnaire = $this->gestionnaire();
+        $zone = Zone::factory()->create();
+
+        QualityThreshold::factory()->create([
+            'zone_id' => $zone->id,
+            'parametre' => 'turbidite',
+            'unite' => 'NTU',
+            'valeur_min' => 0,
+            'valeur_max' => 5,
+        ]);
+
+        $this->fakeGeminiSummary('Une vérification est recommandée.', ['Turbidité élevée.']);
+
+        $payload = [
+            'zone_id' => $zone->id,
+            'date_prelevement' => now()->format('Y-m-d H:i:s'),
+            'parametres' => [
+                'turbidite' => ['valeur' => 9.5],
+            ],
+        ];
+
+        $this->actingAs($gestionnaire)
+            ->post(route('back.quality-samples.store'), $payload)
+            ->assertRedirect();
+
+        $sample = WaterQualitySample::firstOrFail();
+
+        $this->assertSame(1, WaterQualityAlert::where('sample_id', $sample->id)->where('statut', 'active')->count());
+        Http::assertSentCount(1);
+
+        $this->actingAs($gestionnaire)
+            ->put(route('back.quality-samples.update', $sample), $payload)
+            ->assertRedirect();
+
+        $this->assertSame(1, WaterQualityAlert::where('sample_id', $sample->id)->where('statut', 'active')->count());
+        $this->assertSame(1, WaterQualityParameter::where('sample_id', $sample->id)->count());
+        Http::assertSentCount(1);
+    }
+
+    public function test_quality_dashboard_displays_real_statistics_and_parameter_trends(): void
+    {
+        $gestionnaire = $this->gestionnaire();
+        $zone = Zone::factory()->create(['nom' => 'Zone Test']);
+
+        $conforme = WaterQualitySample::factory()->conforme()->create([
+            'zone_id' => $zone->id,
+            'date_prelevement' => '2026-10-01 09:30:00',
+            'score' => 100,
+        ]);
+        WaterQualityParameter::factory()->create([
+            'sample_id' => $conforme->id,
+            'parametre' => 'ph',
+            'valeur' => 7.2,
+            'unite' => 'pH',
+            'est_conforme' => true,
+        ]);
+
+        $nonConforme = WaterQualitySample::factory()->nonConforme()->create([
+            'zone_id' => $zone->id,
+            'date_prelevement' => '2026-10-05 14:15:00',
+            'score' => 50,
+        ]);
+        WaterQualityParameter::factory()->nonConforme()->create([
+            'sample_id' => $nonConforme->id,
+            'parametre' => 'turbidite',
+            'valeur' => 9.5,
+            'unite' => 'NTU',
+            'est_conforme' => false,
+        ]);
+
+        WaterQualityAlert::factory()->create([
+            'sample_id' => $nonConforme->id,
+            'zone_id' => $zone->id,
+            'statut' => 'active',
+        ]);
+        WaterQualityAlert::factory()->resolue()->create([
+            'sample_id' => $nonConforme->id,
+            'zone_id' => $zone->id,
+        ]);
+
+        $dernierConforme = WaterQualitySample::factory()->conforme()->create([
+            'zone_id' => $zone->id,
+            'date_prelevement' => '2026-10-08 11:00:00',
+            'score' => 100,
+        ]);
+        WaterQualityParameter::factory()->create([
+            'sample_id' => $dernierConforme->id,
+            'parametre' => 'ph',
+            'valeur' => 7.4,
+            'unite' => 'pH',
+            'est_conforme' => true,
+        ]);
+
+        $response = $this->actingAs($gestionnaire)->get(route('back.quality-samples.index', [
+            'perimetre' => $zone->id,
+        ]));
+
+        $response->assertOk()
+            ->assertSee('Tableau de bord qualité')
+            ->assertSee('Évolution par périmètre')
+            ->assertSee('Historique chronologique')
+            ->assertSee('En amélioration')
+            ->assertSee('Turbidité')
+            ->assertSee('NTU')
+            ->assertSee('01/10/2026')
+            ->assertSee('05/10/2026')
+            ->assertSee('08/10/2026')
+            ->assertSee('Seuils appliqués')
+            ->assertSee('<polyline', false);
+
+        $response->assertViewHas('stats', fn (array $stats) => $stats['total'] === 3
+            && $stats['conformes'] === 2
+            && $stats['non_conformes'] === 1
+            && $stats['alertes_actives'] === 1
+            && $stats['dernier_prelevement']?->format('Y-m-d H:i') === '2026-10-08 11:00');
+
+        $response->assertViewHas('perimetre', fn (?Zone $perimetre) => $perimetre?->id === $zone->id);
+        $response->assertViewHas('trendDisponible', true);
+
+        $response->assertViewHas('perimetreTrends', function (array $trends) {
+            $codes = array_column($trends, 'parametre');
+
+            return $codes === ['ph', 'turbidite']
+                && count($trends[0]['points']) === 2
+                && $trends[0]['points'][0]['valeur'] === 7.2
+                && $trends[0]['points'][1]['valeur'] === 7.4
+                && $trends[1]['unite'] === 'NTU'
+                && $trends[1]['points'][0]['valeur'] === 9.5
+                && $trends[1]['points'][0]['conforme'] === false;
+        });
+
+        $response->assertViewHas('perimetreHistory', fn ($history) => $history->pluck('reference')->all() === [
+            $conforme->reference,
+            $nonConforme->reference,
+            $dernierConforme->reference,
+        ]);
+    }
+
+    public function test_quality_dashboard_handles_an_empty_database(): void
+    {
+        $gestionnaire = $this->gestionnaire();
+
+        $response = $this->actingAs($gestionnaire)->get(route('back.quality-samples.index'));
+
+        $response->assertOk()
+            ->assertSee('Aucun périmètre sélectionné')
+            ->assertSee('Aucun prélèvement')
+            ->assertDontSee('<polyline', false);
+
+        $response->assertViewHas('stats', fn (array $stats) => $stats['total'] === 0
+            && $stats['conformes'] === 0
+            && $stats['non_conformes'] === 0
+            && $stats['alertes_actives'] === 0
+            && $stats['dernier_prelevement'] === null);
+
+        $response->assertViewHas('perimetre', fn ($perimetre) => $perimetre === null);
+        $response->assertViewHas('perimetreTrends', fn (array $trends) => $trends === []);
+        $response->assertViewHas('perimetreHistory', fn ($history) => $history->isEmpty());
+        $response->assertViewHas('trendDisponible', false);
+    }
+
+    public function test_quality_evolution_is_scoped_to_the_selected_perimetre(): void
+    {
+        $gestionnaire = $this->gestionnaire();
+        $zoneA = Zone::factory()->create(['nom' => 'Zone Alpha']);
+        $zoneB = Zone::factory()->create(['nom' => 'Zone Bêta']);
+
+        $sampleA = WaterQualitySample::factory()->conforme()->create([
+            'zone_id' => $zoneA->id,
+            'date_prelevement' => '2026-10-02 08:00:00',
+        ]);
+        WaterQualityParameter::factory()->create([
+            'sample_id' => $sampleA->id,
+            'parametre' => 'ph',
+            'valeur' => 7.2,
+            'unite' => 'pH',
+            'est_conforme' => true,
+        ]);
+
+        $sampleB = WaterQualitySample::factory()->conforme()->create([
+            'zone_id' => $zoneB->id,
+            'date_prelevement' => '2026-10-03 08:00:00',
+        ]);
+        WaterQualityParameter::factory()->create([
+            'sample_id' => $sampleB->id,
+            'parametre' => 'plomb',
+            'valeur' => 2.0,
+            'unite' => 'µg/L',
+            'est_conforme' => true,
+        ]);
+
+        $responseA = $this->actingAs($gestionnaire)->get(route('back.quality-samples.index', [
+            'perimetre' => $zoneA->id,
+        ]));
+
+        $responseA->assertOk()
+            ->assertSee('Zone Alpha')
+            ->assertDontSee('Plomb')
+            ->assertDontSee('µg/L');
+
+        $responseA->assertViewHas('perimetre', fn (?Zone $perimetre) => $perimetre?->id === $zoneA->id);
+        $responseA->assertViewHas('perimetreTrends', fn (array $trends) => array_column($trends, 'parametre') === ['ph']);
+        $responseA->assertViewHas('perimetreHistory', fn ($history) => $history->pluck('zone_id')->unique()->all() === [$zoneA->id]);
+
+        $responseB = $this->actingAs($gestionnaire)->get(route('back.quality-samples.index', [
+            'perimetre' => $zoneB->id,
+        ]));
+
+        $responseB->assertOk();
+
+        $responseB->assertViewHas('perimetre', fn (?Zone $perimetre) => $perimetre?->id === $zoneB->id);
+        $responseB->assertViewHas('perimetreTrends', fn (array $trends) => array_column($trends, 'parametre') === ['plomb']);
+        $responseB->assertViewHas('perimetreHistory', fn ($history) => $history->pluck('zone_id')->unique()->all() === [$zoneB->id]);
+    }
+
+    public function test_quality_evolution_ignores_unknown_perimetre_selection(): void
+    {
+        $gestionnaire = $this->gestionnaire();
+        $zone = Zone::factory()->create();
+        $sample = WaterQualitySample::factory()->conforme()->create(['zone_id' => $zone->id]);
+        WaterQualityParameter::factory()->create(['sample_id' => $sample->id]);
+
+        $response = $this->actingAs($gestionnaire)->get(route('back.quality-samples.index', [
+            'perimetre' => 999999,
+        ]));
+
+        $response->assertOk()
+            ->assertSee('Aucun périmètre sélectionné')
+            ->assertDontSee('<polyline', false);
+
+        $response->assertViewHas('perimetre', fn ($perimetre) => $perimetre === null);
+        $response->assertViewHas('perimetreTrends', fn (array $trends) => $trends === []);
+        $response->assertViewHas('perimetreHistory', fn ($history) => $history->isEmpty());
+    }
+
+    public function test_quality_evolution_handles_perimetre_without_any_sample(): void
+    {
+        $gestionnaire = $this->gestionnaire();
+        $zone = Zone::factory()->create(['nom' => 'Zone Sans Prélèvement']);
+
+        $response = $this->actingAs($gestionnaire)->get(route('back.quality-samples.index', [
+            'perimetre' => $zone->id,
+        ]));
+
+        $response->assertOk()
+            ->assertSee('Aucun prélèvement pour ce périmètre')
+            ->assertSee('Tendance non déterminable')
+            ->assertDontSee('<polyline', false);
+
+        $response->assertViewHas('perimetreTrends', fn (array $trends) => $trends === []);
+        $response->assertViewHas('perimetreHistory', fn ($history) => $history->isEmpty());
+        $response->assertViewHas('trendDisponible', false);
+    }
+
+    public function test_quality_trend_is_not_reported_without_enough_analysed_samples(): void
+    {
+        $gestionnaire = $this->gestionnaire();
+        $zone = Zone::factory()->create();
+
+        WaterQualitySample::factory()->nonConforme()->create([
+            'zone_id' => $zone->id,
+            'date_prelevement' => '2026-10-01 08:00:00',
+            'score' => 40,
+        ]);
+        WaterQualitySample::factory()->conforme()->create([
+            'zone_id' => $zone->id,
+            'date_prelevement' => '2026-10-02 08:00:00',
+            'score' => 100,
+        ]);
+
+        $response = $this->actingAs($gestionnaire)->get(route('back.quality-samples.index', [
+            'perimetre' => $zone->id,
+        ]));
+
+        $response->assertOk()
+            ->assertSee('Tendance non déterminable')
+            ->assertDontSee('En amélioration')
+            ->assertDontSee('En dégradation');
+
+        $response->assertViewHas('trendDisponible', false);
+    }
+
+    public function test_public_zone_page_displays_parameter_evolution_for_that_zone_only(): void
+    {
+        $zone = Zone::factory()->create();
+        $otherZone = Zone::factory()->create();
+
+        $sample = WaterQualitySample::factory()->conforme()->create([
+            'zone_id' => $zone->id,
+            'date_prelevement' => '2026-09-20 08:00:00',
+        ]);
+        WaterQualityParameter::factory()->create([
+            'sample_id' => $sample->id,
+            'parametre' => 'chlore',
+            'valeur' => 0.4,
+            'unite' => 'mg/L',
+            'est_conforme' => true,
+        ]);
+
+        $otherSample = WaterQualitySample::factory()->conforme()->create([
+            'zone_id' => $otherZone->id,
+            'date_prelevement' => '2026-09-21 08:00:00',
+        ]);
+        WaterQualityParameter::factory()->create([
+            'sample_id' => $otherSample->id,
+            'parametre' => 'plomb',
+            'valeur' => 2.0,
+            'unite' => 'µg/L',
+            'est_conforme' => true,
+        ]);
+
+        $response = $this->get(route('public.quality.zone', $zone));
+
+        $response->assertOk()
+            ->assertSee('Évolution des paramètres')
+            ->assertSee('Chlore résiduel')
+            ->assertSee('mg/L')
+            ->assertSee('20/09/2026')
+            ->assertDontSee('Plomb');
+
+        $response->assertViewHas('trends', function (array $trends) {
+            return array_column($trends, 'parametre') === ['chlore']
+                && $trends[0]['points'][0]['valeur'] === 0.4
+                && $trends[0]['unite'] === 'mg/L';
+        });
     }
 }
