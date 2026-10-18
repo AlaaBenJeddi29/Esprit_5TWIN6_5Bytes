@@ -76,7 +76,17 @@
       "Bash(php artisan test 2>&1 | tail -6)",
       "Bash(vendor/bin/pint --test app/Services/IncidentClusterService.php app/Http/Controllers/Back/IncidentMapController.php app/Http/Requests/Incident/IncidentMapFilterRequest.php tests/Feature/Back/IncidentMapTest.php 2>&1 | tail -6)",
       "Bash(php artisan test 2>&1 | grep -E \"FAILED|Tests:\" | head -10)",
-      "Bash(git status --short | head -40; echo \"---diff stat---\"; git diff --stat | tail -15)"
+      "Bash(git status --short | head -40; echo \"---diff stat---\"; git diff --stat | tail -15)",
+      "Bash(grep -n \"dompdf\\\\|barryvdh\" composer.json composer.lock | head -10; echo \"---pdf usages---\"; grep -rln \"Pdf::\\\\|dompdf\\\\|loadView\" app/ | head; echo \"---dashboard view---\"; sed -n '1,200p' resources/views/back/dashboard.blade.php)",
+      "Bash(grep -rn \"rapportGlobal\" -A 40 app/Http/Controllers/Back/ZoneController.php | head -60; echo \"---pdf view---\"; ls resources/views/back/zones; echo \"---routes exact---\"; grep -n \"dashboard\" routes/web.php)",
+      "Bash(php artisan test --filter=IncidentDashboardTest 2>&1 | tail -80)",
+      "Bash(php artisan test --filter=IncidentDashboardTest 2>&1 | tail -30)",
+      "Bash(vendor/bin/pint app/Services/IncidentStatsService.php app/Http/Requests/Incident/IncidentStatsFilterRequest.php app/Http/Controllers/Back/IncidentDashboardController.php app/Http/Controllers/Back/DashboardController.php app/Http/Controllers/Back/IncidentController.php tests/Feature/Back/IncidentDashboardTest.php 2>&1 | tail -30)",
+      "Bash(php artisan route:list --path=incidents 2>&1 | head -30)",
+      "Bash(php artisan test --filter=IncidentDashboardTest 2>&1 | tail -8)",
+      "Bash(php artisan test 2>&1 | tail -60)",
+      "Bash(npm run build 2>&1 | tail -12)",
+      "Bash(git status --short 2>&1 | head -40)"
     ]
   }
 }

@@ -10,10 +10,15 @@ use App\Models\Quality\WaterQualityAlert;
 use App\Models\Quality\WaterQualitySample;
 use App\Models\Report;
 use App\Models\User;
+use App\Services\IncidentStatsService;
 use Illuminate\View\View;
 
 class DashboardController extends Controller
 {
+    public function __construct(
+        private readonly IncidentStatsService $incidentStats,
+    ) {}
+
     /**
      * Tableau de bord : indicateurs calculés uniquement sur des données réelles.
      */
@@ -43,6 +48,8 @@ class DashboardController extends Controller
             'latestReports' => $latestReports,
             'totalIncidents' => Incident::count(),
             'openIncidents' => Incident::open()->count(),
+            'criticalOpenIncidents' => $this->incidentStats->criticalOpen(),
+            'unassignedOpenIncidents' => $this->incidentStats->unassignedOpen(),
             'samplesThisMonth' => WaterQualitySample::where('date_prelevement', '>=', now()->startOfMonth())->count(),
             'activeQualityAlerts' => WaterQualityAlert::where('statut', 'active')->count(),
             'activeRestrictions' => Restriction::where('statut', 'active')->count(),

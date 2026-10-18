@@ -37,12 +37,29 @@
                 <option value="{{ $key }}" @selected($currentType === $key)>{{ $label }}</option>
             @endforeach
         </select>
+        <select name="severity" class="{{ $inputClass }}">
+            <option value="">Toutes les gravités</option>
+            @foreach ($severities as $key => $label)
+                <option value="{{ $key }}" @selected($currentSeverity === $key)>{{ $label }}</option>
+            @endforeach
+        </select>
         <select name="zone_id" class="{{ $inputClass }}">
             <option value="">Toutes les zones</option>
             @foreach ($zones as $zone)
                 <option value="{{ $zone->id }}" @selected($currentZone === $zone->id)>{{ $zone->nom }}</option>
             @endforeach
         </select>
+        <select name="unassigned" class="{{ $inputClass }}">
+            <option value="">Toutes les affectations</option>
+            <option value="1" @selected($currentUnassigned)>Non affectés (hors doublons)</option>
+        </select>
+        @if ($currentOpen)
+            <input type="hidden" name="open" value="1">
+            <span class="inline-flex items-center gap-2 rounded-lg bg-brand-50 px-3 py-2 text-xs font-medium text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
+                Incidents ouverts uniquement
+                <a href="{{ route('back.incidents.index', request()->except('open')) }}" class="font-semibold hover:underline">Retirer</a>
+            </span>
+        @endif
         <button type="submit" class="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">Filtrer</button>
     </form>
 
