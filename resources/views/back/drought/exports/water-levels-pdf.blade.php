@@ -118,7 +118,7 @@
 </head>
 <body>
     <div class="header">
-        <div class="header-title">📊 Rapport - Niveaux des Ressources</div>
+        <div class="header-title">Rapport - Niveaux des Ressources</div>
         <div class="header-info">
             <span>Date d'export: {{ now()->format('d/m/Y H:i') }}</span>
             <span>Gestionnaire: {{ Auth::user()?->name ?? 'Système' }}</span>

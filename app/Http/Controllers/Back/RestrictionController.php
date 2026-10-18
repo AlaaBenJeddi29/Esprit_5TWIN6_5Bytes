@@ -14,7 +14,6 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\View\View;
-use Maatwebsite\Excel\Facades\Excel;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class RestrictionController extends Controller
@@ -87,22 +86,24 @@ class RestrictionController extends Controller
     }
 
     /**
-     * Export restrictions in PDF or Excel format.
+     * Export restrictions in PDF or CSV format.
      */
-    public function export(Request $request): Response|BinaryFileResponse
+    public function export(Request $request, string $format): Response|BinaryFileResponse
     {
         $zoneId = $request->integer('zone_id') ?: null;
         $statut = $request->string('statut')->toString() ?: null;
         $type = $request->string('type')->toString() ?: null;
-        $format = $request->string('format')->toString() ?: 'pdf';
 
         $restrictions = DroughtExportService::getRestrictionsForExport($zoneId, $statut, $type);
 
-        if ($format === 'excel') {
-            return Excel::download(
-                new RestrictionExport($restrictions),
-                'drought-restrictions-' . now()->format('Ymd-His') . '.xlsx'
-            );
+        if ($format === 'excel' || $format === 'csv') {
+            $export = new RestrictionExport($restrictions);
+            $content = $export->toHtml();
+            $filename = 'drought-restrictions-' . now()->format('Ymd-His') . '.xls';
+            
+            return response($content, 200)
+                ->header('Content-Type', 'text/html; charset=utf-8')
+                ->header('Content-Disposition', 'attachment; filename="' . $filename . '"');
         }
 
         return Pdf::loadView('back.drought.exports.restrictions-pdf', ['restrictions' => $restrictions])

@@ -3,109 +3,56 @@
 namespace App\Exports\Drought;
 
 use Illuminate\Support\Collection;
-use Maatwebsite\Excel\Concerns\FromCollection;
-use Maatwebsite\Excel\Concerns\WithHeadings;
-use Maatwebsite\Excel\Concerns\WithStyles;
-use Maatwebsite\Excel\Concerns\WithColumnWidths;
-use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
-use PhpOffice\PhpSpreadsheet\Style\Fill;
-use PhpOffice\PhpSpreadsheet\Style\Font;
-use PhpOffice\PhpSpreadsheet\Style\Border;
-use PhpOffice\PhpSpreadsheet\Style\Alignment;
 
-class RestrictionExport implements FromCollection, WithHeadings, WithStyles, WithColumnWidths
+class RestrictionExport
 {
     public function __construct(protected Collection $data)
     {
     }
 
     /**
-     * @return Collection
+     * Generate Excel-compatible HTML
      */
-    public function collection(): Collection
+    public function toHtml(): string
     {
-        return $this->data->map(function ($item) {
-            return [
-                $item->titre,
-                $item->typeLabel(),
-                $item->zone?->nom ?? '—',
-                $item->date_debut?->format('d/m/Y H:i') ?? '—',
-                $item->date_fin?->format('d/m/Y H:i') ?? '—',
-                $item->statutLabel(),
-                $item->usages_interdits ?? '—',
-            ];
-        });
-    }
-
-    public function headings(): array
-    {
-        return [
-            'Titre',
-            'Niveau',
-            'Zone',
-            'Date Début',
-            'Date Fin',
-            'Statut',
-            'Usages Interdits',
-        ];
-    }
-
-    public function columnWidths(): array
-    {
-        return [
-            'A' => 25,
-            'B' => 15,
-            'C' => 18,
-            'D' => 18,
-            'E' => 18,
-            'F' => 12,
-            'G' => 25,
-        ];
-    }
-
-    public function styles(Worksheet $sheet): array
-    {
-        $styles = [
-            // Header row formatting
-            1 => [
-                'font' => [
-                    'bold' => true,
-                    'color' => ['rgb' => 'FFFFFF'],
-                ],
-                'fill' => [
-                    'fillType' => Fill::FILL_SOLID,
-                    'startColor' => ['rgb' => '1A5276'],
-                ],
-                'alignment' => [
-                    'horizontal' => Alignment::HORIZONTAL_CENTER,
-                    'vertical' => Alignment::VERTICAL_CENTER,
-                ],
-                'borders' => [
-                    'allBorders' => [
-                        'borderStyle' => Border::BORDER_THIN,
-                        'color' => ['rgb' => '000000'],
-                    ],
-                ],
-            ],
-        ];
-
-        // Apply borders to all rows with data
-        $highestRow = $sheet->getHighestRow();
-        if ($highestRow > 1) {
-            $borderStyle = [
-                'borders' => [
-                    'allBorders' => [
-                        'borderStyle' => Border::BORDER_THIN,
-                        'color' => ['rgb' => '000000'],
-                    ],
-                ],
-            ];
-
-            for ($row = 2; $row <= $highestRow; $row++) {
-                $styles[$row] = $borderStyle;
-            }
+        $html = '<html xmlns:x="urn:schemas-microsoft-com:office:excel">' . "\n";
+        $html .= '<head>' . "\n";
+        $html .= '<meta charset="UTF-8">' . "\n";
+        $html .= '<style>' . "\n";
+        $html .= 'table { border-collapse: collapse; width: 100%; }' . "\n";
+        $html .= 'th, td { border: 1px solid #000; padding: 8px; text-align: left; }' . "\n";
+        $html .= 'th { background-color: #1A5276; color: white; font-weight: bold; text-align: center; }' . "\n";
+        $html .= 'tr:nth-child(even) { background-color: #f2f2f2; }' . "\n";
+        $html .= '</style>' . "\n";
+        $html .= '</head>' . "\n";
+        $html .= '<body>' . "\n";
+        $html .= '<table>' . "\n";
+        
+        // Headers
+        $html .= '<tr>' . "\n";
+        $headers = ['Titre', 'Niveau', 'Zone', 'Date Début', 'Date Fin', 'Statut', 'Usages Interdits'];
+        foreach ($headers as $header) {
+            $html .= '<th>' . htmlspecialchars($header) . '</th>' . "\n";
         }
-
-        return $styles;
+        $html .= '</tr>' . "\n";
+        
+        // Data rows
+        foreach ($this->data as $item) {
+            $html .= '<tr>' . "\n";
+            $html .= '<td>' . htmlspecialchars($item->titre) . '</td>' . "\n";
+            $html .= '<td>' . htmlspecialchars($item->typeLabel()) . '</td>' . "\n";
+            $html .= '<td>' . htmlspecialchars($item->zone?->nom ?? '—') . '</td>' . "\n";
+            $html .= '<td>' . htmlspecialchars($item->date_debut?->format('d/m/Y H:i') ?? '—') . '</td>' . "\n";
+            $html .= '<td>' . htmlspecialchars($item->date_fin?->format('d/m/Y H:i') ?? '—') . '</td>' . "\n";
+            $html .= '<td>' . htmlspecialchars($item->statutLabel()) . '</td>' . "\n";
+            $html .= '<td>' . htmlspecialchars($item->usages_interdits ?? '—') . '</td>' . "\n";
+            $html .= '</tr>' . "\n";
+        }
+        
+        $html .= '</table>' . "\n";
+        $html .= '</body>' . "\n";
+        $html .= '</html>' . "\n";
+        
+        return $html;
     }
 }

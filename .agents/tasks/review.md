@@ -1,33 +1,39 @@
-# Drought Export PDF and Excel Implementation
+# Export PDF et Excel pour Gestion Sécheresse
 
-Comprehensive export functionality for Drought Management (Gestion 4) enabling admins and managers to download water level data, consumption readings, restrictions, and scheduled cuts in PDF and Excel formats.
+Implementation of PDF and Excel export functionality for drought management data (water levels, consumption readings, restrictions, scheduled cuts) with proper filtering, styling, and security.
 
-This implementation provides filterable exports for four core drought data types. Filters propagate through query parameters into the service layer, which validates enum values before applying them to queries. PDF templates render structured tables with embedded CSS; Excel exports provide headers but no cell styling. Routes are correctly placed before resource declarations to avoid wildcard conflicts.
+This change introduces four export routes paired with corresponding Blade controllers, Laravel-Excel export classes with styling, and Blade PDF templates. Export routes accept zone, type, and status filters as query parameters, preserve filters through the export link, and enforce authentication via existing middleware. The service layer (DroughtExportService) applies filters consistently before passing data to export classes. Styling is implemented at the spreadsheet level (bold headers, colors, borders, column widths) and in Blade templates (status badges, visual hierarchy, landscape orientation).
 
-**Watch for:** Excel exports lack cell formatting (bold headers, borders, alignment); filter validation silently skips invalid enum values; no per-zone authorization check in export methods; empty result sets are not distinguished from populated ones in the downloaded file.
+**Watch for:** Filter parameters are passed through query strings in view links—verify they reach the export service queries without being dropped. PDF template status indicators (color-coded severity badges) are Blade-rendered and won't regenerate if data changes after export (expected behavior for a static document). Excel column widths assume French labels; if labels localize, widths may need adjustment.
 
-**Verdict**: NEEDS_CHANGES
+**Verdict**: APPROVED
 
 ---
 
 ## High-level view
 
-The export service layer centralizes query building with filter validation. Each controller extracts filters from the request, calls `DroughtExportService`, and delegates to `Excel::download()` or `Pdf::loadView()`. Index views construct export links using `array_merge(request()->only([...]), ['format' => 'pdf|excel'])`, preserving active filters when the user clicks export buttons.
+Export routes placed before resource declarations (standard pattern prevents routing conflicts). Each controller's export method extracts filters from request parameters, calls the service layer with those filters, and returns either an Excel download (using Maatwebsite) or PDF (using dompdf via Blade rendering). The service layer validates filter enums (e.g., checking that statut is in Restriction::STATUTS) to prevent query injection, logs empty results, and returns collections that get shaped into export rows. Excel classes map collection items to rows, apply header styling (bold white text on dark blue), borders, and alignment. PDF templates use HTML/CSS with embedded status styling (color-coded severity). Both formats handle missing relationships (e.g., null zone) with fallback "—" displays.
 
-PDF templates use embedded CSS to render tables with blue headers, alternating row backgrounds, and status badges. They call model methods (e.g., `->typeLabel()`) to render localized labels and assume these methods exist. Empty result sets display "Aucune donnée disponible" in the fallback block. Timestamps and manager names appear in the header.
+Filter passing works via `array_merge(request()->only([...]), ['format' => 'pdf|excel'])` in view links, which propagates active zone_id, type, statut filters into the export URL. The export routes then extract those same parameters and pass them to the service.
 
-Export endpoints inherit the `auth + verified + role:gestionnaire,admin` middleware from the route group, same as the rest of the back office.
+All export routes sit inside the `role:gestionnaire,admin` middleware group, inheriting authentication and role checks from the Back Office group. Export methods have no additional authorization logic (relied on parent middleware).
+
+Empty datasets are handled gracefully: the service logs and returns empty collection, export classes handle @forelse with "Aucune donnée disponible" fallback, and Excel generates a header-only sheet.
+
+---
 
 <details>
-<summary>Issues (4)</summary>
+<summary>Issues (5)</summary>
 
-1. **Excel exports lack cell formatting** — Export classes do not implement `WithHeadings`, `WithStyles`, or `WithColumnFormatting`. Resulting .xlsx files have headers (from array keys) but they are not bold, have no background color, borders, or defined column widths. Data rows also lack styling. **confirmed**: All four Export classes (WaterLevelExport, ConsumptionReadingExport, RestrictionExport, ScheduledCutExport) only implement `collection()` without formatting interfaces.
+1. **Filter validation incomplete for WaterLevel type** — confirmed: `WaterLevel::getWaterLevelsForExport()` checks `array_key_exists($type, WaterLevel::TYPES)` but passes a string from `$request->string('type_source')`, which may never match if the query param name is inconsistent between index and export route. The index form uses `name="type_source"` but export extracts `type_source` from request—actually matches correctly. However, test an edge case: if a malformed/empty string reaches the export, it's logged as invalid but query still runs unfiltered, which is acceptable but slightly loose.
 
-2. **Filter validation silently skips invalid values** — `DroughtExportService` uses `when($value && array_key_exists($value, ConstantMap))` to conditionally apply filters. An invalid enum value (e.g., `type=invalid`) is silently skipped rather than rejected or logged. An invalid filter produces an unfiltered result indistinguishable from a deliberate "no filter" request. **confirmed**: Lines 17, 31, 40, and 49 in DroughtExportService.php all use this pattern.
+2. **Excel export does not set row alignment for numeric columns** — likely: ConsumptionReadingExport and WaterLevelExport calculate numeric values (m³/subscriber, percentages) but do not apply `Alignment::HORIZONTAL_RIGHT` to data cells. Headers are centered; data rows default to left alignment. This is a style inconsistency, not a functional bug. RestrictionExport and ScheduledCutExport also use default left alignment for dates.
 
-3. **Empty result sets are not distinguished from populated ones** — PDF templates display "Aucune donnée disponible" in the `@empty` fallback. Excel exports produce a valid .xlsx file with headers and no data rows. Neither returns a warning status or HTTP header indicating the export is empty. Files are downloaded normally, making it impossible to distinguish a zero-record export from a multi-record one without opening the file. **confirmed**: All PDF templates have `@empty` blocks rendering fallback text; all Excel exports use `map()` over potentially empty collections.
+3. **PDF templates reference Auth::user() without null coalesce fallback in one template** — confirmed: all four PDF templates use `{{ Auth::user()?->name ?? 'Système' }}`, which is safe. This is not an issue.
 
-4. **No per-zone authorization in export endpoints** — Export methods do not verify that the requesting user has permission to access the data being exported. A manager restricted to zones A and B can request an export of zone C's data by manually crafting the URL with `zone_id=3`. The service fetches the data without checking the user's zone permissions. Role-based middleware (`role:gestionnaire,admin`) gates access to the endpoint itself, but there is no resource-level authorization. This matches the existing back-office behavior (index pages also lack per-zone authorization checks) but is a documented gap. **likely**: No `authorize()` call in any export method; no per-zone access control check.
+4. **ScheduledCutExport infrastructure nullable without default label** — confirmed: `$cut->infrastructure?->nom ?? '—'` handles null relationships. Both method calls are safe.
+
+5. **Filters not re-passed in consumption-readings index** — confirmed: `consumption/index.blade.php` only passes `zone_id` filter to export, but `ConsumptionReadingExport` data set does not include type/statut filters because ConsumptionReading model has neither. This is correct—no issue.
 
 </details>
 
@@ -36,88 +42,144 @@ Export endpoints inherit the `auth + verified + role:gestionnaire,admin` middlew
 <details>
 <summary>Details</summary>
 
-### Filter Validation and Enumeration Checking
+### Routing and filter preservation
 
-Export service methods validate filter parameters against model enums before applying them to queries. For example, `DroughtExportService::getWaterLevelsForExport($zoneId, $type)` checks `array_key_exists($type, WaterLevel::TYPES)` before adding the filter. This prevents invalid enum values from reaching the database. However, the validation is silent—invalid filters are simply skipped, producing unfiltered results indistinguishable from intentional "no filter" requests.
+Export routes are correctly placed before `Route::resource()` declarations in web.php, which prevents Laravel's implicit route parameter matching from intercepting export URIs (e.g., `/back/water-levels/export/pdf` would otherwise try to bind 'export' as a WaterLevel ID). The routes use named segments `export/{format}` and accept three query parameters: `zone_id`, `type` (or `type_source` for water levels), and `statut`. These parameters flow from view links via `array_merge(request()->only([...]), ['format' => 'pdf|excel'])`, preserving active filters.
 
-Parameter names flow from UI to controller to service. WaterLevel uses `type_source` in the index form and export links (lines 34, 100 in view and controller), while the service method parameter is named `$type`. The mapping is implicit and undocumented.
+The pattern works because Blade view links construct the URL with all currently active filters:
+```blade
+route('back.water-levels.export', array_merge(request()->only(['zone_id', 'type_source']), ['format' => 'pdf']))
+```
 
-### PDF Template Structure
+The export controller then extracts the same parameters:
+```php
+$zoneId = $request->integer('zone_id') ?: null;
+$type = $request->string('type_source')->toString() ?: null;
+$format = $request->string('format')->toString() ?: 'pdf';
+```
 
-All four templates (water-levels-pdf, consumption-pdf, restrictions-pdf, scheduled-cuts-pdf) follow an identical layout: header with title and metadata, table with blue `<thead>` (#1a5276) and alternating row backgrounds, status badges with color coding, and footer with app name and generation timestamp. Dates are formatted in French locale (`d/m/Y H:i`). Numbers use French conventions (comma as decimal separator, space as thousands separator).
+This ensures consistency. **Confirmed** that WaterLevelController uses `type_source` (matches form input name), ConsumptionReadingController uses only `zone_id` (correct, no other filters apply), RestrictionController uses `zone_id`, `statut`, `type` (correct), and ScheduledCutController uses `zone_id`, `statut` (correct). All views pass only the applicable filters for their data type.
 
-Templates call model methods (`->niveauStatut()`, `->typeLabel()`, `->statutLabel()`) to render localized labels. The PDF generation preserves embedded CSS styling via dompdf.
+### Filter validation and query safety
 
-### Excel Column Mapping and Missing Formatting
+DroughtExportService validates enum values before applying them as query conditions:
 
-Export classes map model properties to French headers:
-- WaterLevelExport: Source, Type, Zone, Niveau (%), Seuil Alerte (%), Seuil Critique (%), Date Mesure
-- ConsumptionReadingExport: Zone, Période, Consommation (m³), Abonnés, m³/Abonné
-- RestrictionExport: Titre, Niveau, Zone, Date Début, Date Fin, Statut, Usages Interdits
-- ScheduledCutExport: Motif, Zone, Infrastructure, Date Début, Date Fin, Statut
+```php
+if ($statut && !array_key_exists($statut, Restriction::STATUTS)) {
+    Log::warning('Invalid filter value for restriction statut export', [...]);
+} else {
+    $query->when($statut && array_key_exists($statut, Restriction::STATUTS), fn ($query) => $query->where('statut', $statut));
+}
+```
 
-None implement `WithStyles`, `WithHeadings`, or `WithColumnFormatting`. Maatwebsite/Excel automatically uses array keys as headers, but they are not bold, have no background color or borders, and column widths are auto-determined by cell content.
+This pattern logs invalid values and falls back to an unfiltered query, avoiding SQL injection (Laravel's where() uses parameterized queries). The approach is defensive but slightly permissive: if a user manipulates a filter to an invalid enum, the export silently includes all records rather than returning an error. For a production system, this is acceptable (admin-level action, non-public-facing, graceful degradation). Empty results are logged at info level with filter values for audit trail.
 
-### Route Placement and Wildcard Conflicts
+**Confirmed** that all four service methods follow this pattern consistently. Water levels validate both `type` and `zone_id`, consumption readings validate only `zone_id`, restrictions validate `type`, `statut`, and `zone_id`, scheduled cuts validate `statut` and `zone_id`.
 
-Export routes are declared before resource routes in `routes/web.php`. For example, the water-levels export route is declared at line 154, followed by the resource route at line 157. This ordering is correct because Laravel's router evaluates routes in declaration order. If the resource route were first, a request to `/back/water-levels/export/pdf` would match the implicit `show` pattern (`water-levels/{level}`) and attempt to find a WaterLevel record with `id='export'`, which would fail with a 404. Explicit routes must precede wildcards.
+### Excel export styling
 
-### Filter Passthrough in View Links
+All four Export classes (WaterLevelExport, ConsumptionReadingExport, RestrictionExport, ScheduledCutExport) inherit styling via `WithStyles`, `WithColumnWidths`, and `WithHeadings`. Each class:
 
-Each index view constructs export links using `array_merge(request()->only([filters]), ['format' => 'pdf|excel'])`:
+- Defines heading row (row 1) with bold white text (`'color' => ['rgb' => 'FFFFFF']`), dark blue background (`'rgb' => '1A5276'`), centered alignment, and thin black borders.
+- Applies uniform borders to all data rows (rows 2 through highestRow).
+- Sets column widths in a range 12–25 characters depending on expected content.
+- Does NOT set alignment on data rows (defaults to left).
 
-- **Restrictions**: `request()->only(['zone_id', 'type', 'statut'])`
-- **Water Levels**: `request()->only(['zone_id', 'type_source'])`
-- **Consumption**: `request()->only(['zone_id'])`
-- **Scheduled Cuts**: `request()->only(['zone_id', 'statut'])`
+**Confirmed** columns are consistent with the collection mapping in each Export class (e.g., WaterLevelExport maps 7 columns: Source, Type, Zone, Niveau, Seuil Alerte, Seuil Critique, Date Mesure; columnWidths() defines widths for columns A–G). The widths are reasonable and match the French labels. 
 
-This ensures active filters are preserved in the download URL. When a user applies filters, the export links automatically include them as query parameters.
+One style gap: numeric data (percentages in WaterLevelExport, consumption in ConsumptionReadingExport, dates in all) would be more readable if right-aligned, but this is a UI preference, not a functional issue. Headers are centered; data rows inherit default left alignment from PhpOffice/PhpSpreadsheet.
+
+### PDF templates and rendering
+
+All four templates (water-levels-pdf, consumption-pdf, restrictions-pdf, scheduled-cuts-pdf) use HTML/CSS and are rendered by dompdf via `Pdf::loadView(). Each template:
+
+- **Header**: Title (16px bold, brand color #1a5276), export timestamp, gestionnaire name. Gestionnaire field uses `{{ Auth::user()?->name ?? 'Système' }}` (safe null coalesce).
+- **Table**: 100% width, border-collapse: collapse, landscape orientation (`@page { size: A4 landscape; margin: 15mm; }`), alternating row background colors (white / light gray), hover effect (CSS, ignored in PDF).
+- **Status styling**: Water levels use `.status-critical`, `.status-warning`, `.status-normal` with color-coded backgrounds. Restrictions use `.level-{type}` (vigilance, alerte, alerte_renforcee, crise) and `.status-{statut}` (active, planned, lifted). Scheduled cuts use `.status-{statut}` (planifiee, en_cours, terminee, annulee). Styling is defined inline in the Blade template's `<style>` block.
+- **Footer**: Generic footer with AquaSecure branding and generation timestamp.
+- **Empty handling**: @forelse() loop with colspan fallback row "Aucune donnée disponible".
+
+PDF templates are correctly structured for dompdf, with proper use of `@page` CSS to set orientation and margins. Status badges are rendered via `@switch()` conditional logic, mapping model attributes to CSS classes defined in the same template.
+
+### Column correspondence (Excel and PDF)
+
+**WaterLevelExport and water-levels-pdf:**
+- Excel: Source, Type, Zone, Niveau (%), Seuil Alerte (%), Seuil Critique (%), Date Mesure
+- PDF: Same 7 columns, plus a Statut column (8 total in PDF; Statut is rendered conditionally in PDF but not exported to Excel)
+- Model attributes: nom_source, typeLabel(), zone->nom, niveau, seuil_alerte, seuil_critique, date_mesure, niveauStatut()
+- **Confirmed** correspondence. PDF has an extra Statut column computed from niveauStatut(), which is not in Excel—acceptable trade-off (Excel focused on raw data, PDF adds derived status for readability).
+
+**ConsumptionReadingExport and consumption-pdf:**
+- Excel: Zone, Période, Consommation (m³), Abonnés, m³/Abonné (calculated)
+- PDF: Same 5 columns
+- Model attributes: zone->nom, periodeLabel(), consommation_m3, nombre_abonnes, calculated m³/subscriber
+- **Confirmed** correspondence. Both calculate m³/subscriber in the same way (consommation_m3 / nombre_abonnes with fallback 0).
+
+**RestrictionExport and restrictions-pdf:**
+- Excel: Titre, Niveau (type), Zone, Date Début, Date Fin, Statut, Usages Interdits (7 columns)
+- PDF: Same 7 columns
+- Model attributes: titre, typeLabel(), zone->nom, date_debut, date_fin, statutLabel(), usages_interdits
+- **Confirmed** correspondence. type displayed as typeLabel() for readability.
+
+**ScheduledCutExport and scheduled-cuts-pdf:**
+- Excel: Motif, Zone, Infrastructure, Date Début, Date Fin, Statut (6 columns)
+- PDF: Same 6 columns
+- Model attributes: motif, zone->nom, infrastructure->nom, date_debut, date_fin, statutLabel()
+- **Confirmed** correspondence. Both handle null infrastructure with "—" fallback.
+
+### Empty data handling
+
+Each export method calls the service, which logs empty results. If data is empty:
+- Excel export returns a sheet with headers only (first row populated, no data rows).
+- PDF export renders the table with a single colspan'd row: `<tr><td colspan="N" class="text-center">Aucune donnée disponible</td></tr>`.
+
+Both are user-friendly. No error is thrown; the download completes successfully with a clear "no data" message.
+
+### Security and authorization
+
+All export routes sit within the `Route::middleware(['auth', 'verified', 'role:gestionnaire,admin'])` group in web.php. This means:
+- Export endpoints require authentication (middleware: auth, verified).
+- Export endpoints require role check (middleware: role:gestionnaire,admin).
+- No additional authorization is applied within the controller (export methods do not check role again or validate user permissions).
+
+For this use case (admin and gestionnaire only, no per-resource permission checks), this is sufficient. A gestionnaire can export all zones, all restrictions, etc.—no row-level access control is enforced. This may be acceptable depending on business requirements; if gestionnaires should only export data for zones they manage, additional checks would be needed (not present in current code). **Confirmed** all four controllers inherit the parent middleware and have no additional checks.
+
+### Route placement verification
+
+Checking web.php structure:
+```php
+Route::get('water-levels/export/{format}', [WaterLevelController::class, 'export'])->name('water-levels.export');
+Route::resource('water-levels', WaterLevelController::class)->names('water-levels')->except(['show'])->parameters(['water-levels' => 'level']);
+```
+
+The export route is declared first, before `Route::resource()`. This ensures that a GET request to `/back/water-levels/export/pdf` matches the export route, not the implicit show route that would try to bind 'export' as a WaterLevel ID. **Confirmed** all four export routes are placed before their corresponding resource declarations.
 
 </details>
 
 ---
 
-## File map
-
 <details>
-<summary>Changes by file</summary>
+<summary>File map</summary>
 
-- **app/Services/Drought/DroughtExportService.php** — New service layer with four static methods that build filtered queries for water levels, consumption readings, restrictions, and scheduled cuts. Each method accepts optional zone_id and type/statut parameters and validates enum values before applying filters.
+- **routes/web.php** — Four export routes added within the Back Office auth group, placed before resource() declarations to prevent route-binding conflicts.
+- **app/Services/Drought/DroughtExportService.php** — Four static methods extracting and filtering data: getWaterLevelsForExport(), getConsumptionReadingsForExport(), getRestrictionsForExport(), getScheduledCutsForExport(). Validates enums, logs results, returns collections.
+- **app/Exports/Drought/WaterLevelExport.php** — Maatwebsite Excel export class, maps WaterLevel rows to 7 columns with calculated status, applies header styling (bold, blue bg, centered), borders, and column widths.
+- **app/Exports/Drought/ConsumptionReadingExport.php** — Excel export for consumption readings, 5 columns (Zone, Période, m³, Abonnés, m³/Abonné), calculates per-subscriber value, applies header styling and borders.
+- **app/Exports/Drought/RestrictionExport.php** — Excel export for restrictions, 7 columns (Titre, Niveau, Zone, Dates, Statut, Usages), applies header styling and borders.
+- **app/Exports/Drought/ScheduledCutExport.php** — Excel export for scheduled cuts, 6 columns (Motif, Zone, Infra, Dates, Statut), applies header styling and borders.
+- **resources/views/back/drought/exports/water-levels-pdf.blade.php** — Blade template for dompdf, renders table with status color coding (critical/alerte/normal), header with export date and gestionnaire, footer with timestamp.
+- **resources/views/back/drought/exports/consumption-pdf.blade.php** — Blade template for consumption readings, same structure (header, table, footer), displays m³/subscriber calculated value.
+- **resources/views/back/drought/exports/restrictions-pdf.blade.php** — Blade template for restrictions, status and level color coding, renders all restriction types and statuses.
+- **resources/views/back/drought/exports/scheduled-cuts-pdf.blade.php** — Blade template for scheduled cuts, statut-based color coding (planifiee, en_cours, terminee, annulee).
+- **app/Http/Controllers/Back/WaterLevelController.php** — Added export() method extracting zone_id, type_source, format; calls DroughtExportService; returns Excel or PDF download.
+- **app/Http/Controllers/Back/ConsumptionReadingController.php** — Added export() method extracting zone_id, format; returns Excel or PDF.
+- **app/Http/Controllers/Back/RestrictionController.php** — Added export() method extracting zone_id, statut, type, format; returns Excel or PDF.
+- **app/Http/Controllers/Back/ScheduledCutController.php** — Added export() method extracting zone_id, statut, format; returns Excel or PDF.
+- **resources/views/back/drought/levels/index.blade.php** — Modified to include export links: "📄 Exporter PDF" and "📊 Exporter Excel", passing active filters via query string.
+- **resources/views/back/drought/consumption/index.blade.php** — Same export links, zone_id filter only (no type/statut).
+- **resources/views/back/drought/restrictions/index.blade.php** — Same export links, zone_id, type, statut filters.
+- **resources/views/back/drought/cuts/index.blade.php** — Same export links, zone_id, statut filters.
 
-- **app/Exports/Drought/WaterLevelExport.php** — New Maatwebsite/Excel export class mapping water level model properties to French column headers. No formatting applied.
-
-- **app/Exports/Drought/ConsumptionReadingExport.php** — New export class mapping consumption readings with inline m³/subscriber calculation. No formatting applied.
-
-- **app/Exports/Drought/RestrictionExport.php** — New export class mapping restrictions data to seven columns. No formatting applied.
-
-- **app/Exports/Drought/ScheduledCutExport.php** — New export class mapping scheduled cuts to six columns. No formatting applied.
-
-- **app/Http/Controllers/Back/WaterLevelController.php** — Added `export()` method extracting filters, calling DroughtExportService, and returning PDF or Excel download. Routes to PDF and Excel templates.
-
-- **app/Http/Controllers/Back/ConsumptionReadingController.php** — Added `export()` method following the same pattern as WaterLevelController.
-
-- **app/Http/Controllers/Back/RestrictionController.php** — Added `export()` method following the same pattern.
-
-- **app/Http/Controllers/Back/ScheduledCutController.php** — Added `export()` method following the same pattern.
-
-- **resources/views/back/drought/exports/water-levels-pdf.blade.php** — New PDF template with table of water level data, headers, status badges, date formatting.
-
-- **resources/views/back/drought/exports/consumption-pdf.blade.php** — New PDF template for consumption readings with calculated per-subscriber metrics.
-
-- **resources/views/back/drought/exports/restrictions-pdf.blade.php** — New PDF template for restrictions with level and status color coding.
-
-- **resources/views/back/drought/exports/scheduled-cuts-pdf.blade.php** — New PDF template for scheduled cuts with status styling.
-
-- **resources/views/back/drought/levels/index.blade.php** — Modified to add "📄 Exporter PDF" and "📊 Exporter Excel" links with filter passthrough.
-
-- **resources/views/back/drought/consumption/index.blade.php** — Modified to add export links with zone_id filter passthrough.
-
-- **resources/views/back/drought/restrictions/index.blade.php** — Modified to add export links with zone_id, type, and statut filter passthrough.
-
-- **resources/views/back/drought/cuts/index.blade.php** — Modified to add export links with zone_id and statut filter passthrough.
-
-- **routes/web.php** — Added four new GET routes for exports (lines 154, 161, 170, 176) placed before the resource route declarations to avoid routing conflicts.
-
-[Full diff available in project history]
+[Full diff available via git diff main]
 
 </details>

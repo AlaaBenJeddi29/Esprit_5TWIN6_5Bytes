@@ -14,7 +14,6 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\View\View;
-use Maatwebsite\Excel\Facades\Excel;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class WaterLevelController extends Controller
@@ -89,21 +88,23 @@ class WaterLevelController extends Controller
     }
 
     /**
-     * Export water levels in PDF or Excel format.
+     * Export water levels in PDF or CSV format.
      */
-    public function export(Request $request): Response|BinaryFileResponse
+    public function export(Request $request, string $format): Response|BinaryFileResponse
     {
         $zoneId = $request->integer('zone_id') ?: null;
         $type = $request->string('type_source')->toString() ?: null;
-        $format = $request->string('format')->toString() ?: 'pdf';
 
         $levels = DroughtExportService::getWaterLevelsForExport($zoneId, $type);
 
-        if ($format === 'excel') {
-            return Excel::download(
-                new WaterLevelExport($levels),
-                'drought-water-levels-' . now()->format('Ymd-His') . '.xlsx'
-            );
+        if ($format === 'excel' || $format === 'csv') {
+            $export = new WaterLevelExport($levels);
+            $content = $export->toHtml();
+            $filename = 'drought-water-levels-' . now()->format('Ymd-His') . '.xls';
+            
+            return response($content, 200)
+                ->header('Content-Type', 'text/html; charset=utf-8')
+                ->header('Content-Disposition', 'attachment; filename="' . $filename . '"');
         }
 
         return Pdf::loadView('back.drought.exports.water-levels-pdf', ['levels' => $levels])

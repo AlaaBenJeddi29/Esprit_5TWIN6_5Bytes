@@ -15,7 +15,6 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\View\View;
-use Maatwebsite\Excel\Facades\Excel;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class ConsumptionReadingController extends Controller
@@ -100,20 +99,22 @@ class ConsumptionReadingController extends Controller
     }
 
     /**
-     * Export consumption readings in PDF or Excel format.
+     * Export consumption readings in PDF or CSV format.
      */
-    public function export(Request $request): Response|BinaryFileResponse
+    public function export(Request $request, string $format): Response|BinaryFileResponse
     {
         $zoneId = $request->integer('zone_id') ?: null;
-        $format = $request->string('format')->toString() ?: 'pdf';
 
         $readings = DroughtExportService::getConsumptionReadingsForExport($zoneId);
 
-        if ($format === 'excel') {
-            return Excel::download(
-                new ConsumptionReadingExport($readings),
-                'drought-consumption-readings-' . now()->format('Ymd-His') . '.xlsx'
-            );
+        if ($format === 'excel' || $format === 'csv') {
+            $export = new ConsumptionReadingExport($readings);
+            $content = $export->toHtml();
+            $filename = 'drought-consumption-readings-' . now()->format('Ymd-His') . '.xls';
+            
+            return response($content, 200)
+                ->header('Content-Type', 'text/html; charset=utf-8')
+                ->header('Content-Disposition', 'attachment; filename="' . $filename . '"');
         }
 
         return Pdf::loadView('back.drought.exports.consumption-pdf', ['readings' => $readings])

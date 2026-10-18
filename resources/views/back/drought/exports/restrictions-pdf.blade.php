@@ -138,7 +138,7 @@
 </head>
 <body>
     <div class="header">
-        <div class="header-title">⚠️ Rapport - Restrictions d'Utilisation</div>
+        <div class="header-title">Rapport - Restrictions d'Utilisation</div>
         <div class="header-info">
             <span>Date d'export: {{ now()->format('d/m/Y H:i') }}</span>
             <span>Gestionnaire: {{ Auth::user()?->name ?? 'Système' }}</span>
