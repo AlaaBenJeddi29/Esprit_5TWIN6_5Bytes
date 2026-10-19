@@ -2,6 +2,7 @@
 
 use App\Enums\UserRole;
 use App\Http\Controllers\Back\AlertSubscriptionController as BackAlertSubscriptionController;
+use App\Http\Controllers\Back\AuditEventController;
 use App\Http\Controllers\Back\ConsumptionReadingController;
 use App\Http\Controllers\Back\ContractorController;
 use App\Http\Controllers\Back\DashboardController;
@@ -34,6 +35,8 @@ use App\Http\Controllers\Front\PublicDroughtController;
 use App\Http\Controllers\Front\PublicInfrastructureController;
 use App\Http\Controllers\Front\PublicQualityController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\StripeWebhookController;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -61,11 +64,16 @@ Route::get('/projets/{project}', [FrontProjectController::class, 'show'])->name(
 Route::get('/projets/{project}/documents/{document}/telecharger', [FrontProjectController::class, 'downloadDocument'])
     ->name('public.projects.documents.download');
 Route::post('/projets/{project}/assistant', [FrontProjectController::class, 'assistant'])
+    ->middleware('throttle:15,1')
     ->name('public.projects.assistant');
 
 // Suivi public d'un incident par référence
 Route::get('/suivi', [FrontIncidentController::class, 'trackForm'])->name('front.incidents.track.form');
 Route::post('/suivi', [FrontIncidentController::class, 'track'])->name('front.incidents.track');
+
+// Webhook Stripe Checkout : hors authentification, vérifié par signature
+// (CSRF exempté pour cette route uniquement — voir bootstrap/app.php).
+Route::post('/stripe/webhook', StripeWebhookController::class)->name('stripe.webhook');
 
 /*
 |--------------------------------------------------------------------------
@@ -73,7 +81,7 @@ Route::post('/suivi', [FrontIncidentController::class, 'track'])->name('front.in
 |--------------------------------------------------------------------------
 | Conserve le nom Breeze `dashboard` (cible de redirect()->intended()).
 */
-Route::get('/dashboard', function (\Illuminate\Http\Request $request) {
+Route::get('/dashboard', function (Request $request) {
     return match ($request->user()->role) {
         UserRole::Admin, UserRole::Gestionnaire => redirect()->route('back.dashboard'),
         default => redirect()->route('front.home'),
@@ -107,6 +115,10 @@ Route::middleware(['auth', 'verified', 'role:citoyen'])
             ->name('subscriptions.destroy');
 
         Route::post('/projets/{project}/don', [FrontProjectController::class, 'donate'])->name('projects.donate');
+        Route::get('/projets/{project}/don/succes', [FrontProjectController::class, 'donationSuccess'])
+            ->name('projects.donation.success');
+        Route::get('/projets/{project}/don/annule', [FrontProjectController::class, 'donationCancel'])
+            ->name('projects.donation.cancel');
     });
 
 /*
@@ -219,6 +231,9 @@ Route::middleware(['auth', 'verified', 'role:gestionnaire,admin'])
         Route::resource('projects', ProjectController::class)->names('projects');
 
         Route::prefix('projects/{project}')->name('projects.')->group(function () {
+            // Rapport IA du projet (lecture seule — PDF Dompdf, Gestion 5).
+            Route::get('rapport', [ProjectController::class, 'rapport'])->name('rapport');
+
             Route::resource('phases', ProjectPhaseController::class)
                 ->names('phases')
                 ->except(['index', 'show'])
@@ -234,6 +249,9 @@ Route::middleware(['auth', 'verified', 'role:gestionnaire,admin'])
                 ->except(['index', 'show'])
                 ->parameters(['documents' => 'document']);
         });
+
+        // Journal d'audit Gestion 5 (lecture seule — insertion seule par construction).
+        Route::get('audit-events', [AuditEventController::class, 'index'])->name('audit-events.index');
 
         // Gestion des gestionnaires : réservée aux administrateurs (Lot 1b)
         Route::middleware('role:admin')->group(function () {

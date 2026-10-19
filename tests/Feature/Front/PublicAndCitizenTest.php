@@ -18,6 +18,8 @@ use App\Models\Quality\WaterQualityParameter;
 use App\Models\Quality\WaterQualitySample;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -143,22 +145,19 @@ class PublicAndCitizenTest extends TestCase
         $this->assertDatabaseCount('alert_subscriptions', 0);
     }
 
-    public function test_citizen_can_make_a_simulated_donation(): void
+    public function test_donation_is_refused_when_stripe_is_not_configured(): void
     {
+        config(['services.stripe.secret' => null]);
+
         $citizen = User::factory()->citoyen()->create();
-        $project = Project::factory()->create();
+        $project = Project::factory()->create(['statut' => 'en_cours']);
 
         $this->actingAs($citizen)
             ->post(route('citizen.projects.donate', $project), ['montant' => 250])
             ->assertRedirect(route('public.projects.show', $project))
-            ->assertSessionHas('success');
+            ->assertSessionHas('error');
 
-        $this->assertDatabaseHas('fundings', [
-            'project_id' => $project->id,
-            'source' => 'don',
-            'donateur_id' => $citizen->id,
-            'montant' => 250,
-        ]);
+        $this->assertDatabaseCount('fundings', 0);
     }
 
     public function test_donation_is_forbidden_for_gestionnaire_and_invalid_amount_rejected(): void
@@ -181,6 +180,10 @@ class PublicAndCitizenTest extends TestCase
 
     public function test_public_project_assistant_answers_without_external_ai(): void
     {
+        // Ollama est simulé injoignable : l'assistant doit retomber sur son
+        // secours déterministe (mots-clés) sans jamais dépendre d'un IA externe.
+        Http::fake(fn () => throw new ConnectionException('cURL error 7: Failed to connect'));
+
         $project = Project::factory()->create(['budget_prevu' => 100000]);
 
         $this->post(route('public.projects.assistant', $project), [

@@ -85,6 +85,7 @@
             'items' => [
                 ['label' => 'Projets', 'route' => 'back.projects.index', 'pattern' => 'back.projects.*', 'icon' => 'projects'],
                 ['label' => 'Entreprises', 'route' => 'back.contractors.index', 'pattern' => 'back.contractors.*', 'icon' => 'contractors'],
+                ['label' => 'Journal d’audit', 'route' => 'back.audit-events.index', 'pattern' => 'back.audit-events.*', 'icon' => 'report'],
             ],
         ],
     ];

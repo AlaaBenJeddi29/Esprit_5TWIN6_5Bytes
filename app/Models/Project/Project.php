@@ -82,7 +82,9 @@ class Project extends Model
 
     public function fundingTotal(): float
     {
-        return (float) $this->fundings()->sum('montant');
+        // Seuls les financements confirmés comptent : un don Stripe en attente,
+        // annulé ou échoué n'est pas un financement reçu.
+        return (float) $this->fundings()->confirmees()->sum('montant');
     }
 
     public function fundingRate(): float

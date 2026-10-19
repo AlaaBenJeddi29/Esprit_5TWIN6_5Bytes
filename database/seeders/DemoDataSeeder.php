@@ -40,9 +40,8 @@ use Illuminate\Support\Facades\Storage;
  *   dans le disque `local`, jamais des données réelles ;
  * - aucun paiement réel : les dons sont des lignes Funding simulées.
  *
- * Ce seeder n'est PAS appelé automatiquement par DatabaseSeeder. Lancez-le
- * explicitement :
- *   php artisan db:seed --class=DemoDataSeeder
+ * Appelé par DatabaseSeeder (php artisan db:seed) ; exécutable aussi seul :
+ * php artisan db:seed --class=DemoDataSeeder
  */
 class DemoDataSeeder extends Seeder
 {
