@@ -15,6 +15,7 @@
             <div class="mb-8 flex flex-wrap gap-3">
                 <a href="{{ route('citizen.incidents.create') }}" class="inline-flex items-center justify-center rounded-md bg-primary px-5 py-3 text-sm font-medium text-white hover:bg-blue-dark">Signaler un incident</a>
                 <a href="{{ route('citizen.incidents.index') }}" class="inline-flex items-center justify-center rounded-md border border-stroke bg-white px-5 py-3 text-sm font-medium text-dark hover:border-primary hover:text-primary dark:border-dark-3 dark:bg-dark-2 dark:text-white">Mes signalements</a>
+                <a href="{{ route('citizen.feedbacks.index') }}" class="inline-flex items-center justify-center rounded-md border border-stroke bg-white px-5 py-3 text-sm font-medium text-dark hover:border-primary hover:text-primary dark:border-dark-3 dark:bg-dark-2 dark:text-white">Mes évaluations</a>
                 <a href="{{ route('citizen.subscriptions.index') }}" class="inline-flex items-center justify-center rounded-md border border-stroke bg-white px-5 py-3 text-sm font-medium text-dark hover:border-primary hover:text-primary dark:border-dark-3 dark:bg-dark-2 dark:text-white">Mes alertes</a>
                 <a href="{{ route('public.quality.index') }}" class="inline-flex items-center justify-center rounded-md border border-stroke bg-white px-5 py-3 text-sm font-medium text-dark hover:border-primary hover:text-primary dark:border-dark-3 dark:bg-dark-2 dark:text-white">Qualité de l'eau</a>
             </div>
@@ -97,6 +98,32 @@
                         <p class="text-sm text-body-color dark:text-dark-6">Aucune coupure programmée dans vos zones.</p>
                     @endforelse
                 </div>
+            </div>
+
+            {{-- Notifications --}}
+            <div class="mt-6 rounded-md bg-white p-6 shadow-1 dark:bg-dark-2">
+                <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
+                    <h2 class="text-lg font-bold text-dark dark:text-white">Notifications</h2>
+                    @if ($unreadNotifications > 0)
+                        <span class="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">{{ $unreadNotifications }} non lue{{ $unreadNotifications > 1 ? 's' : '' }}</span>
+                    @endif
+                </div>
+
+                @forelse ($notifications as $notification)
+                    @php $data = $notification->data; @endphp
+                    <a href="{{ $data['url'] ?? '#' }}" class="block border-b border-stroke py-3 last:border-0 dark:border-dark-3">
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                            <p class="text-sm font-medium text-dark dark:text-white">{{ $data['title'] ?? 'Notification' }}</p>
+                            <p class="text-xs text-body-color dark:text-dark-6">{{ $notification->created_at?->format('d/m/Y H:i') }}</p>
+                        </div>
+                        <p class="mt-1 text-xs text-body-color dark:text-dark-6">{{ $data['message'] ?? '' }}</p>
+                        @if ($notification->read_at === null)
+                            <span class="mt-1 inline-block text-xs font-medium text-primary">Non lue</span>
+                        @endif
+                    </a>
+                @empty
+                    <p class="text-sm text-body-color dark:text-dark-6">Aucune notification pour le moment.</p>
+                @endforelse
             </div>
 
             {{-- Dons --}}

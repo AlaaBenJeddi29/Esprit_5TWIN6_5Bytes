@@ -3,6 +3,8 @@
 namespace App\Providers;
 
 use App\Models\Incident\Incident;
+use App\Models\Incident\IncidentFeedback;
+use App\Policies\IncidentFeedbackPolicy;
 use App\Policies\IncidentPolicy;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
@@ -23,5 +25,6 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Gate::policy(Incident::class, IncidentPolicy::class);
+        Gate::policy(IncidentFeedback::class, IncidentFeedbackPolicy::class);
     }
 }

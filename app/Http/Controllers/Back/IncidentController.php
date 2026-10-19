@@ -119,6 +119,7 @@ class IncidentController extends Controller
             'photos',
             'comments.user',
             'statusHistories.user',
+            'feedbacks.user',
         ]);
 
         return view('back.incidents.show', [

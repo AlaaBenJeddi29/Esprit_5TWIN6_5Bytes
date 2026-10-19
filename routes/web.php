@@ -2,6 +2,7 @@
 
 use App\Enums\UserRole;
 use App\Http\Controllers\Back\AlertSubscriptionController as BackAlertSubscriptionController;
+use App\Http\Controllers\Back\ComplaintController;
 use App\Http\Controllers\Back\ConsumptionReadingController;
 use App\Http\Controllers\Back\ContractorController;
 use App\Http\Controllers\Back\DashboardController;
@@ -27,11 +28,13 @@ use App\Http\Controllers\Front\AlertSubscriptionController;
 use App\Http\Controllers\Front\CitizenDashboardController;
 use App\Http\Controllers\Front\HomeController;
 use App\Http\Controllers\Front\IncidentController as FrontIncidentController;
+use App\Http\Controllers\Front\IncidentFeedbackController as FrontIncidentFeedbackController;
 use App\Http\Controllers\Front\ProjectController as FrontProjectController;
 use App\Http\Controllers\Front\PublicDroughtController;
 use App\Http\Controllers\Front\PublicInfrastructureController;
 use App\Http\Controllers\Front\PublicQualityController;
 use App\Http\Controllers\ProfileController;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -71,7 +74,7 @@ Route::post('/suivi', [FrontIncidentController::class, 'track'])->name('front.in
 |--------------------------------------------------------------------------
 | Conserve le nom Breeze `dashboard` (cible de redirect()->intended()).
 */
-Route::get('/dashboard', function (\Illuminate\Http\Request $request) {
+Route::get('/dashboard', function (Request $request) {
     return match ($request->user()->role) {
         UserRole::Admin, UserRole::Gestionnaire => redirect()->route('back.dashboard'),
         default => redirect()->route('front.home'),
@@ -98,6 +101,12 @@ Route::middleware(['auth', 'verified', 'role:citoyen'])
             ->name('incidents.photos.store');
         Route::get('/mes-incidents/{incident}/photos/{photo}/telecharger', [FrontIncidentController::class, 'downloadPhoto'])
             ->name('incidents.photos.download');
+
+        // Évaluations et réclamations citoyennes
+        Route::get('/mes-evaluations', [FrontIncidentFeedbackController::class, 'index'])
+            ->name('feedbacks.index');
+        Route::post('/mes-incidents/{incident}/evaluation', [FrontIncidentFeedbackController::class, 'store'])
+            ->name('incidents.feedback.store');
 
         Route::get('/alertes', [AlertSubscriptionController::class, 'index'])->name('subscriptions.index');
         Route::post('/alertes', [AlertSubscriptionController::class, 'store'])->name('subscriptions.store');
@@ -149,6 +158,23 @@ Route::middleware(['auth', 'verified', 'role:gestionnaire,admin'])
             ->name('incidents.comments.store');
         Route::get('incidents/{incident}/photos/{photo}/telecharger', [BackIncidentController::class, 'downloadPhoto'])
             ->name('incidents.photos.download');
+
+        // Réclamations et satisfaction citoyenne
+        // « stats » est déclarée AVANT {feedback} pour ne pas être capturée
+        // par la route de détail.
+        Route::get('complaints/stats', [ComplaintController::class, 'stats'])->name('complaints.stats');
+        Route::get('complaints', [ComplaintController::class, 'index'])->name('complaints.index');
+        Route::get('complaints/{feedback}', [ComplaintController::class, 'show'])->name('complaints.show');
+        Route::patch('complaints/{feedback}/review', [ComplaintController::class, 'review'])
+            ->name('complaints.review');
+        Route::post('complaints/{feedback}/response', [ComplaintController::class, 'respond'])
+            ->name('complaints.response');
+        Route::patch('complaints/{feedback}/decision', [ComplaintController::class, 'decide'])
+            ->name('complaints.decision');
+        Route::patch('complaints/{feedback}/close', [ComplaintController::class, 'close'])
+            ->name('complaints.close');
+        Route::patch('complaints/{feedback}/reopen', [ComplaintController::class, 'reopen'])
+            ->name('complaints.reopen');
 
         // Gestion 3 — Qualité de l'eau
         Route::resource('quality-thresholds', QualityThresholdController::class)

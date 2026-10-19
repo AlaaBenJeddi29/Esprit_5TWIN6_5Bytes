@@ -201,6 +201,34 @@
             </div>
 
             <div class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
+                <h2 class="text-base font-medium text-gray-800 dark:text-white/90">Avis et réclamations</h2>
+                <div class="mt-3 space-y-3">
+                    @forelse ($incident->feedbacks as $feedback)
+                        <div class="rounded-xl border border-gray-100 p-3 dark:border-gray-800">
+                            <div class="flex flex-wrap items-center justify-between gap-2">
+                                <p class="text-sm font-medium text-gray-800 dark:text-white/90">{{ $feedback->user?->name ?? 'Citoyen supprimé' }}</p>
+                                <p class="text-sm text-warning-400">{{ str_repeat('★', $feedback->rating) }}<span class="text-gray-300">{{ str_repeat('☆', 5 - $feedback->rating) }}</span></p>
+                            </div>
+                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                {{ $feedback->resolution_confirmed ? 'Résolution confirmée' : 'Résolution non confirmée' }}
+                                · {{ $feedback->created_at?->format('d/m/Y H:i') }}
+                            </p>
+                            @if ($feedback->hasComplaint())
+                                <div class="mt-2 flex flex-wrap items-center gap-2">
+                                    <span class="inline-flex rounded-full bg-warning-50 px-2.5 py-0.5 text-xs font-medium text-warning-600 dark:bg-warning-500/15 dark:text-warning-400">{{ $feedback->complaintStatusLabel() }}</span>
+                                    <a href="{{ route('back.complaints.show', $feedback) }}" class="text-xs font-medium text-brand-500 hover:underline dark:text-brand-400">Examiner la réclamation</a>
+                                </div>
+                            @else
+                                <p class="mt-2 text-xs text-gray-400 dark:text-gray-500">Aucune réclamation.</p>
+                            @endif
+                        </div>
+                    @empty
+                        <p class="text-sm text-gray-500 dark:text-gray-400">Aucune évaluation citoyenne.</p>
+                    @endforelse
+                </div>
+            </div>
+
+            <div class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
                 <h2 class="text-base font-medium text-gray-800 dark:text-white/90">Historique des statuts</h2>
                 <ol class="mt-3 space-y-4">
                     @forelse ($incident->statusHistories as $history)

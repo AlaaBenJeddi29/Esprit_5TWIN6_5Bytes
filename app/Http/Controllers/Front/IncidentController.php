@@ -7,7 +7,6 @@ use App\Http\Requests\Incident\StoreIncidentCommentRequest;
 use App\Http\Requests\Incident\StoreIncidentPhotoRequest;
 use App\Http\Requests\Incident\StoreIncidentRequest;
 use App\Models\Incident\Incident;
-use App\Models\Incident\IncidentComment;
 use App\Models\Infrastructure\Infrastructure;
 use App\Models\Infrastructure\Zone;
 use App\Services\DuplicateDetector;
@@ -24,8 +23,7 @@ class IncidentController extends Controller
     public function __construct(
         private readonly IncidentClassifier $classifier,
         private readonly DuplicateDetector $duplicateDetector,
-    ) {
-    }
+    ) {}
 
     public function index(Request $request): View
     {
@@ -106,6 +104,9 @@ class IncidentController extends Controller
             'photos',
             'comments' => fn ($query) => $query->where('is_internal', false)->with('user')->latest(),
             'statusHistories.user',
+            'feedbacks' => fn ($query) => $query
+                ->where('user_id', $request->user()->id)
+                ->with(['histories.user']),
         ]);
 
         return view('front.incidents.show', compact('incident'));

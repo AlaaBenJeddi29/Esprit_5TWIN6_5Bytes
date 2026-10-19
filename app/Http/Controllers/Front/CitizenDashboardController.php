@@ -74,6 +74,9 @@ class CitizenDashboardController extends Controller
             ->where('donateur_id', $user->id)
             ->sum('montant');
 
+        $notifications = $user->notifications()->latest()->limit(5)->get();
+        $unreadNotifications = $user->unreadNotifications()->count();
+
         return view('front.citizen.dashboard', compact(
             'incidents',
             'openIncidents',
@@ -83,6 +86,8 @@ class CitizenDashboardController extends Controller
             'cuts',
             'donations',
             'donationsTotal',
+            'notifications',
+            'unreadNotifications',
         ));
     }
 }

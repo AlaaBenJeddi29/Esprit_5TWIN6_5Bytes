@@ -35,6 +35,15 @@
                 $reachedStatuses = $incident->statusHistories->pluck('nouveau_statut')->push($incident->status)->filter()->unique();
                 $stageRank = array_flip(array_keys($stages));
                 $currentRank = $stageRank[$incident->status] ?? -1;
+                $feedback = $incident->feedbacks->first();
+                $complaintTone = fn (string $status) => match ($status) {
+                    'en_attente' => 'bg-yellow-50 text-yellow-600',
+                    'en_examen' => 'bg-blue-50 text-primary',
+                    'acceptee' => 'bg-green-50 text-secondary',
+                    'rejetee' => 'bg-red-50 text-red-500',
+                    'cloturee' => 'bg-gray-1 text-body-color dark:bg-dark-3 dark:text-dark-7',
+                    default => 'bg-gray-1 text-body-color',
+                };
             @endphp
 
             <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -114,6 +123,164 @@
                                     <p class="mt-1 text-xs text-green-700">Clôturé le {{ $incident->resolved_at->format('d/m/Y H:i') }}</p>
                                 @endif
                             </div>
+                        @endif
+                    </div>
+
+                    {{-- Avis et réclamation citoyenne --}}
+                    <div id="avis" class="rounded-md bg-white p-6 shadow-1 dark:bg-dark-2 md:p-8">
+                        <h2 class="text-lg font-bold text-dark dark:text-white">Votre avis sur le traitement</h2>
+
+                        @if (! $feedback && $incident->status === 'traite')
+                            <p class="mt-2 text-sm text-body-color dark:text-dark-6">
+                                Votre signalement a été traité le {{ $incident->resolved_at?->format('d/m/Y') }}. Votre évaluation aide les services techniques à améliorer la qualité du réseau.
+                            </p>
+
+                            @if ($errors->has('feedback'))
+                                <div class="mt-4 rounded-md border-l-4 border-red-500 bg-red-50 p-4">
+                                    <p class="text-sm text-red-700">{{ $errors->first('feedback') }}</p>
+                                </div>
+                            @endif
+
+                            <form method="POST" action="{{ route('citizen.incidents.feedback.store', $incident) }}" class="mt-5 space-y-5">
+                                @csrf
+
+                                <div>
+                                    <span class="block text-sm font-medium text-dark dark:text-white">Note de satisfaction <span class="text-red-500">*</span></span>
+                                    <div class="mt-2 flex items-center gap-1">
+                                        @for ($star = 1; $star <= 5; $star++)
+                                            <label class="cursor-pointer" title="{{ $star }} étoile{{ $star > 1 ? 's' : '' }}">
+                                                <input type="radio" name="rating" value="{{ $star }}" class="peer sr-only" required @checked((int) old('rating') === $star)>
+                                                <span class="text-3xl leading-none text-gray-300 transition peer-checked:text-yellow-400">{{ '★' }}</span>
+                                            </label>
+                                        @endfor
+                                        <span class="ml-2 text-xs text-body-color dark:text-dark-6">1 à 5 étoiles</span>
+                                    </div>
+                                    @error('rating')<p class="mt-1 text-xs text-red-500">{{ $message }}</p>@enderror
+                                </div>
+
+                                <div>
+                                    <label for="feedback-comment" class="mb-2 block text-sm font-medium text-dark dark:text-white">Commentaire (facultatif)</label>
+                                    <textarea id="feedback-comment" name="comment" rows="3" maxlength="2000" class="{{ $inputClass }} @error('comment') border-red-500 @enderror" placeholder="Partagez votre expérience sur le traitement du signalement…">{{ old('comment') }}</textarea>
+                                    @error('comment')<p class="mt-1 text-xs text-red-500">{{ $message }}</p>@enderror
+                                </div>
+
+                                <div>
+                                    <span class="block text-sm font-medium text-dark dark:text-white">Le problème est-il réellement résolu ? <span class="text-red-500">*</span></span>
+                                    <div class="mt-2 flex flex-wrap gap-4">
+                                        <label class="flex items-center gap-2 text-sm text-body-color dark:text-dark-6">
+                                            <input type="radio" name="resolution_confirmed" value="1" class="text-primary" required @checked((string) old('resolution_confirmed') === '1')>
+                                            Oui, le problème est résolu
+                                        </label>
+                                        <label class="flex items-center gap-2 text-sm text-body-color dark:text-dark-6">
+                                            <input type="radio" name="resolution_confirmed" value="0" class="text-primary" @checked((string) old('resolution_confirmed') === '0')>
+                                            Non, le problème persiste
+                                        </label>
+                                    </div>
+                                    @error('resolution_confirmed')<p class="mt-1 text-xs text-red-500">{{ $message }}</p>@enderror
+                                </div>
+
+                                <div>
+                                    <label for="feedback-complaint" class="mb-2 block text-sm font-medium text-dark dark:text-white">Déposer une réclamation</label>
+                                    <textarea id="feedback-complaint" name="complaint_description" rows="4" maxlength="2000" class="{{ $inputClass }} @error('complaint_description') border-red-500 @enderror" placeholder="Décrivez la situation si le problème persiste (10 à 2000 caractères). Obligatoire si vous indiquez que le problème persiste.">{{ old('complaint_description') }}</textarea>
+                                    <p class="mt-1 text-xs text-body-color dark:text-dark-6">Une seule évaluation est possible par signalement. La réclamation sera examinée par un gestionnaire.</p>
+                                    @error('complaint_description')<p class="mt-1 text-xs text-red-500">{{ $message }}</p>@enderror
+                                </div>
+
+                                <label class="flex items-start gap-2 text-sm text-body-color dark:text-dark-6">
+                                    <input type="checkbox" name="reopen_requested" value="1" class="mt-0.5 rounded border-stroke text-primary" @checked(old('reopen_requested'))>
+                                    <span>Je demande la réouverture de l'incident. <span class="text-xs">La réouverture effective reste soumise à la décision d'un gestionnaire.</span></span>
+                                </label>
+                                @error('reopen_requested')<p class="mt-1 text-xs text-red-500">{{ $message }}</p>@enderror
+
+                                <button type="submit" class="rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-white hover:bg-blue-dark">Envoyer mon évaluation</button>
+                            </form>
+                        @elseif ($feedback)
+                            <div class="mt-4 flex flex-wrap items-center gap-3">
+                                <span class="text-2xl leading-none text-yellow-400">{{ str_repeat('★', $feedback->rating) }}</span>
+                                <span class="text-2xl leading-none text-gray-300">{{ str_repeat('☆', 5 - $feedback->rating) }}</span>
+                                <span class="text-sm font-semibold text-dark dark:text-white">{{ $feedback->rating }}/5</span>
+                                <span class="text-xs text-body-color dark:text-dark-6">Envoyée le {{ $feedback->created_at?->format('d/m/Y à H:i') }}</span>
+                                <span class="inline-flex rounded-full px-3 py-1 text-xs font-medium {{ $feedback->resolution_confirmed ? 'bg-green-50 text-secondary' : 'bg-red-50 text-red-500' }}">
+                                    {{ $feedback->resolution_confirmed ? 'Problème résolu' : 'Problème persistant' }}
+                                </span>
+                            </div>
+
+                            @if ($feedback->comment)
+                                <p class="mt-4 whitespace-pre-line text-sm leading-relaxed text-body-color dark:text-dark-6">{{ $feedback->comment }}</p>
+                            @endif
+
+                            @if ($feedback->hasComplaint())
+                                <div class="mt-5 border-t border-stroke pt-5 dark:border-dark-3">
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <p class="text-sm font-semibold text-dark dark:text-white">Votre réclamation</p>
+                                        <span class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium {{ $complaintTone($feedback->complaint_status) }}">{{ $feedback->complaintStatusLabel() }}</span>
+                                        @if ($feedback->reopen_requested)
+                                            <span class="inline-flex rounded-full bg-yellow-50 px-2.5 py-0.5 text-xs font-medium text-yellow-600">Réouverture demandée</span>
+                                        @endif
+                                    </div>
+
+                                    <p class="mt-3 whitespace-pre-line text-sm text-body-color dark:text-dark-6">{{ $feedback->complaint_description }}</p>
+
+                                    @if ($feedback->complaint_status === 'en_attente')
+                                        <p class="mt-3 rounded-md bg-yellow-50 p-3 text-xs text-yellow-700">Votre réclamation est en attente d'examen par un gestionnaire.</p>
+                                    @elseif ($feedback->complaint_status === 'en_examen')
+                                        <p class="mt-3 rounded-md bg-blue-50 p-3 text-xs text-primary">Votre réclamation est en cours d'examen.</p>
+                                    @elseif ($feedback->complaint_status === 'acceptee')
+                                        <p class="mt-3 rounded-md bg-green-50 p-3 text-xs text-green-800">Votre réclamation a été acceptée.</p>
+                                    @elseif ($feedback->complaint_status === 'rejetee')
+                                        <p class="mt-3 rounded-md bg-red-50 p-3 text-xs text-red-700">Votre réclamation a été refusée.</p>
+                                    @elseif ($feedback->complaint_status === 'cloturee')
+                                        <p class="mt-3 rounded-md bg-gray-1 p-3 text-xs text-body-color dark:bg-dark-3 dark:text-dark-6">Le dossier de réclamation est clôturé.</p>
+                                    @endif
+
+                                    @if ($feedback->manager_response)
+                                        <div class="mt-4 rounded-md border border-green-100 bg-green-50 p-4">
+                                            <p class="text-xs font-semibold uppercase tracking-wide text-green-700">Réponse du gestionnaire</p>
+                                            <p class="mt-1 whitespace-pre-line text-sm text-green-800">{{ $feedback->manager_response }}</p>
+                                        </div>
+                                    @endif
+
+                                    @if ($feedback->decision_reason)
+                                        <div class="mt-3 rounded-md bg-gray-1 p-4 dark:bg-dark-3">
+                                            <p class="text-xs font-semibold uppercase tracking-wide text-body-color dark:text-dark-6">
+                                                Décision : {{ $feedback->complaintDecisionLabel() ?? 'rendue' }}
+                                            </p>
+                                            <p class="mt-1 whitespace-pre-line text-sm text-dark dark:text-white">{{ $feedback->decision_reason }}</p>
+                                        </div>
+                                    @endif
+
+                                    @if ($feedback->reopened_at)
+                                        <p class="mt-3 text-xs text-secondary">Incident réouvert le {{ $feedback->reopened_at->format('d/m/Y à H:i') }}.</p>
+                                    @endif
+
+                                    @if ($feedback->histories->isNotEmpty())
+                                        <ol class="mt-5 space-y-3">
+                                            @foreach ($feedback->histories as $history)
+                                                <li class="border-l-2 border-primary pl-4">
+                                                    <p class="text-xs font-medium text-dark dark:text-white">{{ $history->actionLabel() }}</p>
+                                                    <p class="mt-0.5 text-xs text-body-color dark:text-dark-6">
+                                                        {{ $history->created_at?->format('d/m/Y H:i') }}
+                                                        @if ($history->user && $history->action !== 'depot')
+                                                            · {{ $history->user->name }}
+                                                        @endif
+                                                    </p>
+                                                    @if ($history->comment && $history->action !== 'depot')
+                                                        <p class="mt-1 whitespace-pre-line text-xs text-body-color dark:text-dark-6">{{ $history->comment }}</p>
+                                                    @endif
+                                                </li>
+                                            @endforeach
+                                        </ol>
+                                    @endif
+                                </div>
+                            @else
+                                <p class="mt-4 border-t border-stroke pt-4 text-sm text-body-color dark:border-dark-3 dark:text-dark-6">
+                                    Aucune réclamation n'est associée à cette évaluation.
+                                </p>
+                            @endif
+                        @else
+                            <p class="mt-2 text-sm text-body-color dark:text-dark-6">
+                                L'évaluation sera disponible dès que ce signalement sera traité par les services techniques.
+                            </p>
                         @endif
                     </div>
 

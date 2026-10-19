@@ -4,6 +4,11 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Enums\UserRole;
+use App\Models\Incident\Incident;
+use App\Models\Incident\IncidentFeedback;
+use App\Models\Project\Funding;
+use App\Models\Project\Project;
+use App\Models\Quality\WaterQualitySample;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -66,7 +71,7 @@ class User extends Authenticatable
      */
     public function responsableProjects(): HasMany
     {
-        return $this->hasMany(\App\Models\Project\Project::class, 'responsable_id');
+        return $this->hasMany(Project::class, 'responsable_id');
     }
 
     /**
@@ -74,7 +79,7 @@ class User extends Authenticatable
      */
     public function donations(): HasMany
     {
-        return $this->hasMany(\App\Models\Project\Funding::class, 'donateur_id');
+        return $this->hasMany(Funding::class, 'donateur_id');
     }
 
     /**
@@ -82,7 +87,7 @@ class User extends Authenticatable
      */
     public function incidents(): HasMany
     {
-        return $this->hasMany(\App\Models\Incident\Incident::class);
+        return $this->hasMany(Incident::class);
     }
 
     /**
@@ -90,7 +95,23 @@ class User extends Authenticatable
      */
     public function assignedIncidents(): HasMany
     {
-        return $this->hasMany(\App\Models\Incident\Incident::class, 'assigned_to');
+        return $this->hasMany(Incident::class, 'assigned_to');
+    }
+
+    /**
+     * Évaluations et réclamations déposées par cet utilisateur.
+     */
+    public function incidentFeedbacks(): HasMany
+    {
+        return $this->hasMany(IncidentFeedback::class);
+    }
+
+    /**
+     * Réclamations examinées par cet utilisateur.
+     */
+    public function reviewedIncidentFeedbacks(): HasMany
+    {
+        return $this->hasMany(IncidentFeedback::class, 'reviewed_by');
     }
 
     /**
@@ -106,7 +127,7 @@ class User extends Authenticatable
      */
     public function qualitySamples(): HasMany
     {
-        return $this->hasMany(\App\Models\Quality\WaterQualitySample::class);
+        return $this->hasMany(WaterQualitySample::class);
     }
 
     /**
