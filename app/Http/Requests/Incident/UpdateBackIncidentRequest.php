@@ -29,12 +29,15 @@ class UpdateBackIncidentRequest extends FormRequest
             'longitude' => ['nullable', 'numeric', 'between:-180,180'],
             'severity' => ['required', Rule::in(array_keys(Incident::SEVERITIES))],
             'priority' => ['required', Rule::in(array_keys(Incident::PRIORITIES))],
-            'status' => ['required', Rule::in(array_keys(Incident::STATUSES))],
+            // Le statut et le compte rendu se modifient exclusivement via le
+            // workflow (back.incidents.status), jamais par l'édition générale.
+            'status' => ['prohibited'],
             'assigned_to' => [
                 'nullable',
                 Rule::exists('users', 'id')->whereIn('role', ['gestionnaire', 'admin']),
             ],
-            'resolution_note' => ['nullable', 'string', 'max:2000'],
+            'resolution_note' => ['prohibited'],
+            'rejection_reason' => ['prohibited'],
         ];
     }
 }

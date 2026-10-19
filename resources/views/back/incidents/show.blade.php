@@ -56,8 +56,15 @@
 
                 @if ($incident->resolution_note)
                     <div class="mt-6 rounded-xl border border-success-100 bg-success-50/60 p-4 dark:border-success-500/20 dark:bg-success-500/10">
-                        <p class="text-xs font-semibold uppercase text-success-600 dark:text-success-400">Note de résolution</p>
-                        <p class="mt-1 text-sm text-gray-700 dark:text-gray-300">{{ $incident->resolution_note }}</p>
+                        <p class="text-xs font-semibold uppercase text-success-600 dark:text-success-400">Compte rendu de résolution</p>
+                        <p class="mt-1 whitespace-pre-line text-sm text-gray-700 dark:text-gray-300">{{ $incident->resolution_note }}</p>
+                    </div>
+                @endif
+
+                @if ($incident->status === 'rejete' && $incident->rejection_reason)
+                    <div class="mt-6 rounded-xl border border-error-100 bg-error-50/60 p-4 dark:border-error-500/20 dark:bg-error-500/10">
+                        <p class="text-xs font-semibold uppercase text-error-600 dark:text-error-400">Motif de rejet</p>
+                        <p class="mt-1 whitespace-pre-line text-sm text-gray-700 dark:text-gray-300">{{ $incident->rejection_reason }}</p>
                     </div>
                 @endif
             </div>
@@ -122,21 +129,59 @@
         <div class="col-span-12 space-y-6 xl:col-span-4">
             <div class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
                 <h2 class="text-base font-medium text-gray-800 dark:text-white/90">Changer le statut</h2>
-                <form method="POST" action="{{ route('back.incidents.status', $incident) }}" class="mt-3 space-y-3">
-                    @csrf
-                    @method('PATCH')
-                    <select name="status" class="{{ $inputClass }} @error('status') border-error-400 @enderror">
-                        @foreach ($statuses as $key => $label)
-                            <option value="{{ $key }}" @selected(old('status', $incident->status) === $key)>{{ $label }}</option>
-                        @endforeach
-                    </select>
-                    @error('status')<p class="text-xs text-error-600">{{ $message }}</p>@enderror
-                    <textarea name="comment" rows="2" placeholder="Commentaire de transition (facultatif)" class="{{ $inputClass }} @error('comment') border-error-400 @enderror">{{ old('comment') }}</textarea>
-                    @error('comment')<p class="text-xs text-error-600">{{ $message }}</p>@enderror
-                    <textarea name="resolution_note" rows="2" placeholder="Note de résolution (facultatif)" class="{{ $inputClass }} @error('resolution_note') border-error-400 @enderror">{{ old('resolution_note', $incident->resolution_note) }}</textarea>
-                    @error('resolution_note')<p class="text-xs text-error-600">{{ $message }}</p>@enderror
-                    <button type="submit" class="w-full rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-600">Mettre à jour</button>
-                </form>
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Seules les transitions autorisées par le workflow sont proposées.</p>
+
+                @php
+                    $isReopening = in_array($incident->status, ['traite', 'rejete'], true);
+                @endphp
+
+                @if ($allowedTransitions === [])
+                    <p class="mt-3 text-sm text-gray-500 dark:text-gray-400">Aucune transition disponible.</p>
+                @else
+                    <form method="POST" action="{{ route('back.incidents.status', $incident) }}" class="mt-3 space-y-3">
+                        @csrf
+                        @method('PATCH')
+
+                        <div>
+                            <label for="incident-status-target" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Nouveau statut</label>
+                            <select id="incident-status-target" name="status" class="{{ $inputClass }} @error('status') border-error-400 @enderror">
+                                @foreach ($allowedTransitions as $key => $label)
+                                    <option value="{{ $key }}" @selected(old('status') === $key)>{{ $label }}</option>
+                                @endforeach
+                            </select>
+                            @error('status')<p class="mt-1 text-xs text-error-600">{{ $message }}</p>@enderror
+                        </div>
+
+                        <div data-status-field="comment">
+                            <label for="incident-comment" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                Commentaire{{ $isReopening ? ' (motif de réouverture)' : '' }}
+                            </label>
+                            <textarea id="incident-comment" name="comment" rows="2" class="{{ $inputClass }} @error('comment') border-error-400 @enderror" placeholder="{{ $isReopening ? 'Justifiez la réouverture (10 caractères minimum)' : 'Commentaire de transition (facultatif)' }}">{{ old('comment') }}</textarea>
+                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                {{ $isReopening
+                                    ? 'Obligatoire : au moins 10 caractères pour justifier la réouverture.'
+                                    : 'Facultatif. Conservé dans l\'historique de l\'incident.' }}
+                            </p>
+                            @error('comment')<p class="mt-1 text-xs text-error-600">{{ $message }}</p>@enderror
+                        </div>
+
+                        <div data-status-field="resolution_note">
+                            <label for="incident-resolution-note" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Compte rendu de résolution</label>
+                            <textarea id="incident-resolution-note" name="resolution_note" rows="3" class="{{ $inputClass }} @error('resolution_note') border-error-400 @enderror" placeholder="Obligatoire pour clôturer l'incident">{{ old('resolution_note') }}</textarea>
+                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Obligatoire si le statut cible est « Traité » — 10 à 2000 caractères.</p>
+                            @error('resolution_note')<p class="mt-1 text-xs text-error-600">{{ $message }}</p>@enderror
+                        </div>
+
+                        <div data-status-field="rejection_reason">
+                            <label for="incident-rejection-reason" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Motif de rejet</label>
+                            <textarea id="incident-rejection-reason" name="rejection_reason" rows="3" class="{{ $inputClass }} @error('rejection_reason') border-error-400 @enderror" placeholder="Obligatoire pour rejeter l'incident">{{ old('rejection_reason') }}</textarea>
+                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Obligatoire si le statut cible est « Rejeté » — 10 à 2000 caractères.</p>
+                            @error('rejection_reason')<p class="mt-1 text-xs text-error-600">{{ $message }}</p>@enderror
+                        </div>
+
+                        <button type="submit" class="w-full rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-600">Mettre à jour le statut</button>
+                    </form>
+                @endif
             </div>
 
             <div class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
@@ -161,16 +206,27 @@
                     @forelse ($incident->statusHistories as $history)
                         <li class="border-l-2 border-brand-200 pl-4 dark:border-brand-500/30">
                             <p class="text-sm font-medium text-gray-800 dark:text-white/90">
-                                {{ $history->nouveauStatutLabel() }}
                                 @if ($history->ancienStatutLabel())
-                                    <span class="text-xs font-normal text-gray-500 dark:text-gray-400">(depuis {{ $history->ancienStatutLabel() }})</span>
+                                    {{ $history->ancienStatutLabel() }} → {{ $history->nouveauStatutLabel() }}
+                                @else
+                                    {{ $history->nouveauStatutLabel() }} <span class="text-xs font-normal text-gray-500 dark:text-gray-400">(création)</span>
                                 @endif
                             </p>
                             <p class="text-xs text-gray-500 dark:text-gray-400">
                                 {{ $history->created_at?->format('d/m/Y H:i') }} · {{ $history->user?->name ?? 'Système' }}
                             </p>
                             @if ($history->comment)
-                                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ $history->comment }}</p>
+                                <p class="mt-1 whitespace-pre-line text-xs text-gray-500 dark:text-gray-400">{{ $history->comment }}</p>
+                            @endif
+                            @if ($history->resolution_note)
+                                <p class="mt-1 whitespace-pre-line text-xs text-gray-500 dark:text-gray-400">
+                                    <span class="font-semibold">Compte rendu :</span> {{ $history->resolution_note }}
+                                </p>
+                            @endif
+                            @if ($history->rejection_reason)
+                                <p class="mt-1 whitespace-pre-line text-xs text-gray-500 dark:text-gray-400">
+                                    <span class="font-semibold">Motif de rejet :</span> {{ $history->rejection_reason }}
+                                </p>
                             @endif
                         </li>
                     @empty
@@ -181,3 +237,32 @@
         </div>
     </div>
 @endsection
+
+@push('scripts')
+    <script>
+        (() => {
+            const select = document.getElementById('incident-status-target');
+            if (!select) {
+                return;
+            }
+
+            const fields = document.querySelectorAll('[data-status-field]');
+
+            const sync = () => {
+                const target = select.value;
+
+                fields.forEach((field) => {
+                    const key = field.dataset.statusField;
+                    const visible = key === 'comment'
+                        || (key === 'resolution_note' && target === 'traite')
+                        || (key === 'rejection_reason' && target === 'rejete');
+
+                    field.classList.toggle('hidden', !visible);
+                });
+            };
+
+            sync();
+            select.addEventListener('change', sync);
+        })();
+    </script>
+@endpush
