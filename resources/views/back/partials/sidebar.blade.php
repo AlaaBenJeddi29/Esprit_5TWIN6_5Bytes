@@ -46,11 +46,28 @@
         ],
         [
             'title' => "Gestion 3 — Qualité de l'eau",
-            'items' => [
+            'items' => array_values(array_filter([
                 ['label' => 'Prélèvements', 'route' => 'back.quality-samples.index', 'pattern' => 'back.quality-samples.*', 'icon' => 'quality'],
+                [
+                    'label' => 'Planifications',
+                    'route' => 'back.quality-planifications.index',
+                    'pattern' => [
+                        'back.quality-planifications.index',
+                        'back.quality-planifications.create',
+                        'back.quality-planifications.store',
+                        'back.quality-planifications.edit',
+                        'back.quality-planifications.update',
+                        'back.quality-planifications.destroy',
+                    ],
+                    'icon' => 'threshold',
+                ],
+                ['label' => 'Calendrier', 'route' => 'back.quality-planifications.calendar', 'pattern' => 'back.quality-planifications.calendar', 'icon' => 'cuts'],
                 ['label' => 'Seuils', 'route' => 'back.quality-thresholds.index', 'pattern' => 'back.quality-thresholds.*', 'icon' => 'threshold'],
                 ['label' => 'Alertes', 'route' => 'back.quality-alerts.index', 'pattern' => 'back.quality-alerts.*', 'icon' => 'alert'],
-            ],
+                $user?->isAdmin()
+                    ? ['label' => 'Affectations zones', 'route' => 'back.quality-assignments.index', 'pattern' => 'back.quality-assignments.*', 'icon' => 'zones']
+                    : null,
+            ])),
         ],
         [
             'title' => 'Gestion 4 — Sécheresse',
