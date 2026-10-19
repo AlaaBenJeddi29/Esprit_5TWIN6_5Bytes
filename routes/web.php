@@ -16,7 +16,9 @@ use App\Http\Controllers\Back\ProjectController;
 use App\Http\Controllers\Back\ProjectDocumentController;
 use App\Http\Controllers\Back\ProjectPhaseController;
 use App\Http\Controllers\Back\QualityAlertController;
+use App\Http\Controllers\Back\QualityPlanificationController;
 use App\Http\Controllers\Back\QualityThresholdController;
+use App\Http\Controllers\Back\QualityZoneAssignmentController;
 use App\Http\Controllers\Back\ReportController;
 use App\Http\Controllers\Back\RestrictionController;
 use App\Http\Controllers\Back\ScheduledCutController;
@@ -162,6 +164,19 @@ Route::middleware(['auth', 'verified', 'role:gestionnaire,admin'])
             ->names('quality-alerts')
             ->only(['index', 'update', 'destroy'])
             ->parameters(['quality-alerts' => 'alert']);
+
+        // Planification des prélèvements — route calendrier déclarée AVANT la
+        // ressource pour ne pas être capturée par {planification}.
+        Route::get('quality-planifications/calendrier', [QualityPlanificationController::class, 'calendar'])
+            ->name('quality-planifications.calendar');
+        Route::resource('quality-planifications', QualityPlanificationController::class)
+            ->names('quality-planifications')
+            ->except(['show'])
+            ->parameters(['quality-planifications' => 'planification']);
+        Route::get('quality-zone-assignments', [QualityZoneAssignmentController::class, 'index'])
+            ->name('quality-assignments.index');
+        Route::put('quality-zone-assignments', [QualityZoneAssignmentController::class, 'update'])
+            ->name('quality-assignments.update');
 
         // Gestion 4 — Sécheresse, consommation et continuité de service
         Route::resource('water-levels', WaterLevelController::class)
