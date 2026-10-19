@@ -11,7 +11,7 @@ return [
     | as Mailgun, Postmark, AWS, and more. This file provides the conventional
     | location for service credentials.
     |
-    /
+    */
 
     'postmark' => [
         'key' => env('POSTMARK_API_KEY'),
@@ -34,11 +34,11 @@ return [
         ],
     ],
 
-    /
+    /*
     |--------------------------------------------------------------------------
     | Gemini AI
     |--------------------------------------------------------------------------
-    /
+    */
 
     'gemini' => [
         'api_key' => env('GEMINI_API_KEY'),
@@ -47,7 +47,7 @@ return [
         'ca_bundle' => env('GEMINI_CA_BUNDLE'),
     ],
 
-    /
+    /*
     |--------------------------------------------------------------------------
     | Ollama (Local AI — Gestion 1 Reports)
     |--------------------------------------------------------------------------
@@ -61,6 +61,25 @@ return [
         'url' => env('OLLAMA_URL', 'http://localhost:11434'),
         'model' => env('OLLAMA_MODEL', 'llama3.2'),
         'timeout' => (int) env('OLLAMA_TIMEOUT', 120),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Confirmation IA des incidents similaires
+    |--------------------------------------------------------------------------
+    |
+    | Fournisseur compatible OpenAI (/chat/completions). Désactivé par défaut :
+    | la détection reste entièrement locale tant que XAI_API_KEY est absente.
+    | L'URL et le modèle sont configurables pour rester indépendant du
+    | fournisseur (xAI, Groq, etc.).
+    |
+    */
+
+    'xai' => [
+        'api_key' => env('XAI_API_KEY'),
+        'url' => env('XAI_API_URL', 'https://api.x.ai/v1/chat/completions'),
+        'model' => env('XAI_MODEL', 'grok-4.7'),
+        'timeout' => (int) env('XAI_TIMEOUT', 15),
     ],
 
 ];
