@@ -191,6 +191,11 @@ class Zone extends Model
         return $this->hasMany(\App\Models\Drought\ConsumptionReading::class);
     }
 
+    public function consumptionForecasts(): HasMany
+    {
+        return $this->hasMany(\App\Models\Drought\ConsumptionForecast::class);
+    }
+
     public function restrictions(): HasMany
     {
         return $this->hasMany(\App\Models\Drought\Restriction::class);
