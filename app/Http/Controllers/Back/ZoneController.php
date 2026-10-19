@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Back;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Infrastructure\StoreZoneRequest;
 use App\Http\Requests\Infrastructure\UpdateZoneRequest;
+use App\Mail\RapportGestionMailable;
 use App\Models\Infrastructure\Maintenance;
 use App\Models\Infrastructure\Zone;
 use App\Services\GestionReportService;
@@ -13,6 +14,8 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\View\View;
 
 class ZoneController extends Controller
@@ -189,6 +192,9 @@ class ZoneController extends Controller
      * Rapport global PDF de la Gestion 1 : indicateurs, analyse IA locale
      * (Ollama, avec texte de secours), classement des zones, top 10 des
      * infrastructures à risque, répartitions, coûts et anomalies.
+     *
+     * Le PDF généré est envoyé par email au gestionnaire ou administrateur
+     * actif qui le demande, puis téléchargé.
      */
     public function rapportGlobal(GestionReportService $service): Response
     {
@@ -201,13 +207,53 @@ class ZoneController extends Controller
         $donnees = $service->donnees();
         $texte   = $service->texteIA($donnees);
 
+        $nomFichier = 'rapport-gestion-1-'.now()->format('Y-m-d').'.pdf';
+
         $pdf = Pdf::loadView('back.rapports.gestion-1-pdf', [
             'donnees' => $donnees,
             'texte'   => $texte['texte'],
             'source'  => $texte['source'],
         ])->setPaper('a4');
 
-        return $pdf->download('rapport-gestion-1-'.now()->format('Y-m-d').'.pdf');
+        $contenuPdf = $pdf->output();
+
+        // Envoi automatique par email (avant le téléchargement)
+        $this->envoyerRapportParEmail($contenuPdf, $nomFichier);
+
+        return response($contenuPdf, Response::HTTP_OK, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="'.$nomFichier.'"',
+        ]);
+    }
+
+    /**
+     * Envoie le PDF uniquement au gestionnaire ou administrateur actif qui l'a
+     * demandé.
+     *
+     * Les échecs d'envoi sont journalisés sans interrompre le téléchargement.
+     *
+     * @param  string  $contenuPdf  Contenu binaire du PDF (sortie de DomPDF)
+     * @param  string  $nomFichier  Nom de fichier affiché dans la pièce jointe
+     */
+    private function envoyerRapportParEmail(string $contenuPdf, string $nomFichier): void
+    {
+        $user = request()->user();
+        if ($user === null || ! $user->is_active || ! $user->canAccessBackOffice() || blank($user->email)) {
+            Log::warning('Rapport Gestion 1 : aucun demandeur actif avec une adresse email valide.');
+
+            return;
+        }
+
+        try {
+            Mail::to($user->email)->send(
+                new RapportGestionMailable($contenuPdf, $nomFichier),
+            );
+        } catch (\Throwable $e) {
+            // L'envoi échoue (SMTP non configuré, réseau, etc.) : on journalise
+            // sans bloquer le téléchargement du rapport par l'utilisateur.
+            report($e);
+            Log::error('Rapport Gestion 1 : échec d\'envoi email — '.$e->getMessage());
+        }
     }
 
     public function store(StoreZoneRequest $request): RedirectResponse
