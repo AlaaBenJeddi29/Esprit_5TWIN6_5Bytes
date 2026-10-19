@@ -1,0 +1,25 @@
+{
+  "id": "FEAT-003",
+  "type": "feat",
+  "description": "Public API endpoint for consumption forecasting: Create routes/api.php, API controller, and JSON response that exposes historical + forecast + confidence intervals + quality metrics for integration with mobile/external systems.",
+  "status": "pending",
+  "steps": [
+    "Create routes/api.php with middleware group 'api' (no auth required, as forecast is public data per Gestion 4 design). Define route: GET /api/v1/drought/zones/{zone}/consumption/forecast routed to Api\\V1\\DroughtController@forecastZone with route model binding.",
+    "Create app/Http/Controllers/Api/V1/DroughtController.php. Method forecastZone(Zone $zone): JsonResponse. Logic: (1) Fetch zone with consumption_readings (last 12 months via latest 12 order by periode desc). (2) Fetch consumption_forecasts (6 months via latest 6 for this zone). (3) Compute quality metrics: mae from latest forecast, prediction_confidence = 1 - (mae / mean_historical_value), count_forecast_months. (4) Format and return JSON response with structure: { 'zone': {...}, 'historical_data': [...], 'forecast': [...], 'confidence_intervals': {...}, 'quality_metrics': {...} }. Use DateTimeFormatter for French month labels.",
+    "Update ConsumptionReadingController::forecast() method to also fetch and pass ConsumptionForecast data to the blade view.",
+    "Test endpoint: curl http://localhost:8000/api/v1/drought/zones/1/consumption/forecast | jq . and verify response structure."
+  ],
+  "acceptance_criteria": [
+    "routes/api.php exists and is registered in app.",
+    "GET /api/v1/drought/zones/{id}/consumption/forecast returns 200 with valid JSON.",
+    "JSON response includes: zone object, historical_data array, forecast array, confidence_intervals object, quality_metrics object.",
+    "All numeric values are decimal (2 places for m³).",
+    "Month labels are in French (e.g., 'janvier 2026')."
+  ],
+  "verification": [
+    "php artisan route:list | grep -i 'api/v1' (shows the route registered)",
+    "curl -s http://localhost:8000/api/v1/drought/zones/1/consumption/forecast | jq . (returns valid JSON without errors)"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

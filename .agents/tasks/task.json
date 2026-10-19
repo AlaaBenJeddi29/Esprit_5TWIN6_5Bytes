@@ -1,7 +1,7 @@
 {
-  "task_id": "task-drought-export",
-  "task_description": "Implement PDF and Excel export functionality for Drought Management (Gestion 4) — Water Levels, Consumption Readings, Restrictions, and Scheduled Cuts tables with respected filters",
+  "task_id": "ai-forecast-implementation",
+  "task_description": "Implement complete AI/ML water consumption forecasting system for Gestion 4 (Drought & Service Continuity). Includes 24-month synthetic seeder, Holt-Winters forecasting in PHP, scheduled jobs, API endpoint, and interactive Chart.js frontend.",
   "status": "pending",
-  "feature_order": ["FEAT-001", "FEAT-002"],
+  "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003", "FEAT-004"],
   "blocked_reason": null
 }

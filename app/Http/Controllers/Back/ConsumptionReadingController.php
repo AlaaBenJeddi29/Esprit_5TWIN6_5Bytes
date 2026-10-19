@@ -10,18 +10,23 @@ use App\Models\Drought\ConsumptionReading;
 use App\Models\Infrastructure\Zone;
 use App\Services\Drought\DroughtExportService;
 use App\Services\DroughtAnalyzer;
+use App\Services\ConsumptionForecastService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\View\View;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Carbon;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class ConsumptionReadingController extends Controller
 {
-    public function __construct(private readonly DroughtAnalyzer $analyzer)
-    {
-    }
+    public function __construct(
+        private readonly DroughtAnalyzer $analyzer,
+        private readonly ConsumptionForecastService $forecastService,
+    ) {}
+
 
     public function index(Request $request): View
     {
@@ -46,15 +51,50 @@ class ConsumptionReadingController extends Controller
         $zoneId = $request->integer('zone_id');
         $zones = Zone::orderBy('nom')->when($zoneId, fn ($query) => $query->whereKey($zoneId))->get();
 
-        $forecasts = $zones->map(fn (Zone $zone) => [
-            'zone' => $zone,
-            'forecast' => $this->analyzer->forecast($zone),
-            'risk' => $this->analyzer->riskScore($zone),
-        ]);
+        $forecasts = $zones->map(function (Zone $zone) {
+            $cacheKey = "forecast_zone_{$zone->id}";
+
+            $liveData = Cache::remember($cacheKey, now()->addHour(), function () use ($zone) {
+                $result = $this->forecastService->predictNextMonths($zone, 6);
+
+                // Build forecast points with Carbon month labels starting from next month
+                $forecastPoints = [];
+                $startMonth = Carbon::now()->startOfMonth()->addMonth();
+                foreach ($result['predictions'] as $i => $prediction) {
+                    $forecastPoints[] = [
+                        'month'  => $startMonth->copy()->addMonths($i)->translatedFormat('M Y'),
+                        'date'   => $startMonth->copy()->addMonths($i)->format('Y-m-d'),
+                        'value'  => $prediction,
+                        'lower'  => $result['lower_bounds'][$i] ?? 0,
+                        'upper'  => $result['upper_bounds'][$i] ?? 0,
+                    ];
+                }
+
+                return [
+                    'forecastPoints' => $forecastPoints,
+                    'mae'            => $result['mae'],
+                    'model'          => $result['model'],
+                    'hasPredictions' => count($result['predictions']) > 0,
+                ];
+            });
+
+            return [
+                'zone'             => $zone,
+                'forecast'         => $this->analyzer->forecast($zone),
+                'risk'             => $this->analyzer->riskScore($zone),
+                'forecastPoints'   => collect($liveData['forecastPoints']),
+                'mae'              => $liveData['mae'],
+                'hasPredictions'   => $liveData['hasPredictions'],
+                'historicalReadings' => $zone->consumptionReadings()
+                    ->orderBy('periode')
+                    ->get()
+                    ->take(-12),
+            ];
+        });
 
         return view('back.drought.consumption.forecast', [
-            'forecasts' => $forecasts,
-            'zones' => Zone::orderBy('nom')->get(),
+            'forecasts'   => $forecasts,
+            'zones'       => Zone::orderBy('nom')->get(),
             'currentZone' => $zoneId ?: null,
         ]);
     }
@@ -68,7 +108,8 @@ class ConsumptionReadingController extends Controller
 
     public function store(StoreConsumptionReadingRequest $request): RedirectResponse
     {
-        ConsumptionReading::create($request->validated());
+        $reading = ConsumptionReading::create($request->validated());
+        Cache::forget("forecast_zone_{$reading->zone_id}");
 
         return redirect()
             ->route('back.consumption-readings.index')
@@ -83,6 +124,7 @@ class ConsumptionReadingController extends Controller
     public function update(UpdateConsumptionReadingRequest $request, ConsumptionReading $reading): RedirectResponse
     {
         $reading->update($request->validated());
+        Cache::forget("forecast_zone_{$reading->zone_id}");
 
         return redirect()
             ->route('back.consumption-readings.index')
@@ -91,7 +133,9 @@ class ConsumptionReadingController extends Controller
 
     public function destroy(ConsumptionReading $reading): RedirectResponse
     {
+        $zoneId = $reading->zone_id;
         $reading->delete();
+        Cache::forget("forecast_zone_{$zoneId}");
 
         return redirect()
             ->route('back.consumption-readings.index')

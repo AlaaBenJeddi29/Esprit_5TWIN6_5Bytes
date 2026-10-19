@@ -1,38 +1,27 @@
 {
   "id": "FEAT-002",
   "type": "feat",
-  "description": "Implement export endpoints and UI: add export() methods to all 4 controllers (WaterLevelController, ConsumptionReadingController, RestrictionController, ScheduledCutController) to handle both PDF and Excel formats via query parameter ?format=pdf or ?format=excel. Create PDF view templates. Add 'Export PDF' and 'Export Excel' buttons to all 4 index views. Add routes for export endpoints. Filters must be passed through query parameters so export respects applied filters.",
+  "description": "Core forecasting engine: Implement Holt-Winters exponential smoothing algorithm in PHP, queued job for batch forecast generation, and Artisan console command with scheduling for automatic daily regeneration.",
   "status": "pending",
   "steps": [
-    "Add 4 routes to routes/web.php in the 'back' group: GET back/water-levels/export, back/consumption-readings/export, back/restrictions/export, back/scheduled-cuts/export — use route name export (e.g., back.water-levels.export)",
-    "Add export() method to WaterLevelController: accept Request, extract zone_id and type_source from query, call DroughtExportService::getWaterLevelsForExport(), render PDF if format=pdf (using dompdf) or return WaterLevelExport::download() if format=excel. File names: drought-water-levels-{date}.pdf or .xlsx",
-    "Add export() method to ConsumptionReadingController: same pattern, extract zone_id only, call DroughtExportService::getConsumptionReadingsForExport()",
-    "Add export() method to RestrictionController: extract zone_id, statut, type; call DroughtExportService::getRestrictionsForExport()",
-    "Add export() method to ScheduledCutController: extract zone_id, statut; call DroughtExportService::getScheduledCutsForExport()",
-    "Create resources/views/back/drought/exports/water-levels-pdf.blade.php: landscape orientation, header with 'Water Levels Report', export date, manager name (Auth::user()->name), table with all columns, page numbers in footer",
-    "Create resources/views/back/drought/exports/consumption-pdf.blade.php with same layout for consumption data",
-    "Create resources/views/back/drought/exports/restrictions-pdf.blade.php for restrictions",
-    "Create resources/views/back/drought/exports/scheduled-cuts-pdf.blade.php for cuts",
-    "Add 'Export PDF' and 'Export Excel' buttons to resources/views/back/drought/levels/index.blade.php above the table, preserving current filter parameters in URLs",
-    "Add same buttons to resources/views/back/drought/consumption/index.blade.php",
-    "Add same buttons to resources/views/back/drought/restrictions/index.blade.php",
-    "Add same buttons to resources/views/back/drought/cuts/index.blade.php"
+    "Create app/Services/ConsumptionForecastService.php with method predictNextMonths(Zone $zone, int $months = 6): array. Implement Holt-Winters (exponential smoothing with seasonality). Algorithm: (1) Initialize level L, trend T, seasonal factors S from first 12 months of historical data. (2) For each historical month, update L, T, S using smoothing parameters α=0.3, β=0.1, γ=0.1. (3) For each forecast month (1..6), compute prediction = (L + month×T) × S[seasonal_index]. (4) Confidence intervals: lower = prediction × 0.85, upper = prediction × 1.15. (5) Compute MAE on hold-out set (last 3 historical months predicted vs. actual). Return array: ['predictions' => [...], 'lower_bounds' => [...], 'upper_bounds' => [...], 'mae' => float, 'model' => 'holt_winters'].",
+    "Create app/Jobs/GenerateConsumptionForecasts.php implementing ShouldQueue. Constructor: receives Zone $zone. Handle method: (1) Call ConsumptionForecastService::predictNextMonths($zone, 6). (2) For each forecast month, upsert row into consumption_forecasts table with (zone_id, forecast_month, prediction_m3, lower_bound, upper_bound, model_used='holt_winters', mae). Use upsertUsing or firstOrCreate/update pattern.",
+    "Create app/Console/Commands/RefreshForecasts.php with command signature 'drought:refresh-forecasts'. In handle(): (1) Fetch all zones. (2) For each zone, dispatch GenerateConsumptionForecasts job or call it synchronously if fast. (3) Output: 'Forecasts regenerated for N zones.'",
+    "Modify app/Console/Kernel.php schedule(): Add line: $schedule->command('drought:refresh-forecasts')->dailyAt('23:00');",
+    "Test manually: php artisan drought:refresh-forecasts and verify consumption_forecasts table has rows for all zones."
   ],
   "acceptance_criteria": [
-    "All 4 export routes are defined in web.php and accessible (verified with `php artisan route:list | grep export`)",
-    "GET /back/water-levels/export?format=pdf returns a PDF file with Content-Type: application/pdf and correct filename",
-    "GET /back/water-levels/export?format=excel returns an Excel file with proper headers and formatting",
-    "PDF exports respect all filters: ?zone_id=1&type_source=barrage exports only that subset",
-    "Excel exports respect filters",
-    "Export buttons are visible on all 4 index pages",
-    "Clicking export buttons preserves current filter state in the export file"
+    "ConsumptionForecastService correctly implements Holt-Winters and returns valid predictions with confidence intervals.",
+    "GenerateConsumptionForecasts job successfully upserts forecast data into DB.",
+    "RefreshForecasts command runs without errors and regenerates forecasts for all zones.",
+    "Kernel schedule includes the command with dailyAt('23:00').",
+    "consumption_forecasts table contains 30+ rows after running the command (5 zones × 6 months each)."
   ],
   "verification": [
-    "php artisan test — all tests pass (no new failures)",
-    "Manual test each export route: curl 'http://localhost:8000/back/water-levels/export?format=pdf&zone_id=1' > /tmp/test.pdf && file /tmp/test.pdf (should show PDF)",
-    "Manual test Excel: curl 'http://localhost:8000/back/water-levels/export?format=excel' > /tmp/test.xlsx && file /tmp/test.xlsx (should show Microsoft Excel)",
-    "Open a browser to /back/water-levels, apply filter (e.g., zone_id=1), click 'Export PDF', verify downloaded file contains only zone 1 data",
-    "Repeat for Excel and all 4 tables"
+    "php artisan drought:refresh-forecasts (completes with success message)",
+    "mysql -u root -e \"SELECT COUNT(*) FROM aquasecure.consumption_forecasts;\" (output: 30 or more)",
+    "mysql -u root -e \"SELECT forecast_month, prediction_m3, model_used FROM aquasecure.consumption_forecasts LIMIT 5;\" (shows correct data)",
+    "php artisan schedule:list (shows 'drought:refresh-forecasts' with 'Daily at 23:00')"
   ],
   "blocked_reason": null,
   "findings": ""
