@@ -47,6 +47,18 @@
             </x-slot:action>
         </x-back.stat-card>
 
+        <x-back.stat-card label="Critiques ouverts" :value="$criticalOpenIncidents" hint="Incidents critiques non clôturés">
+            <x-slot:action>
+                <a href="{{ route('back.incidents.index', ['severity' => 'critique', 'open' => 1]) }}" class="text-xs font-medium text-brand-500 hover:underline dark:text-brand-400">Voir</a>
+            </x-slot:action>
+        </x-back.stat-card>
+
+        <x-back.stat-card label="Non affectés" :value="$unassignedOpenIncidents" hint="Ouverts, sans responsable, hors doublons">
+            <x-slot:action>
+                <a href="{{ route('back.incidents.index', ['unassigned' => 1, 'open' => 1]) }}" class="text-xs font-medium text-brand-500 hover:underline dark:text-brand-400">Voir</a>
+            </x-slot:action>
+        </x-back.stat-card>
+
         <x-back.stat-card label="Alertes qualité actives" :value="$activeQualityAlerts">
             <x-slot:action>
                 <a href="{{ route('back.quality-alerts.index', ['statut' => 'active']) }}" class="text-xs font-medium text-brand-500 hover:underline dark:text-brand-400">Voir</a>

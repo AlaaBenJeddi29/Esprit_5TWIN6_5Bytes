@@ -8,13 +8,17 @@ use App\Http\Controllers\Back\DashboardController;
 use App\Http\Controllers\Back\FundingController;
 use App\Http\Controllers\Back\GestionnaireController;
 use App\Http\Controllers\Back\IncidentController as BackIncidentController;
+use App\Http\Controllers\Back\IncidentDashboardController;
+use App\Http\Controllers\Back\IncidentMapController;
 use App\Http\Controllers\Back\InfrastructureController;
 use App\Http\Controllers\Back\MaintenanceController;
 use App\Http\Controllers\Back\ProjectController;
 use App\Http\Controllers\Back\ProjectDocumentController;
 use App\Http\Controllers\Back\ProjectPhaseController;
 use App\Http\Controllers\Back\QualityAlertController;
+use App\Http\Controllers\Back\QualityPlanificationController;
 use App\Http\Controllers\Back\QualityThresholdController;
+use App\Http\Controllers\Back\QualityZoneAssignmentController;
 use App\Http\Controllers\Back\ReportController;
 use App\Http\Controllers\Back\RestrictionController;
 use App\Http\Controllers\Back\ScheduledCutController;
@@ -132,6 +136,14 @@ Route::middleware(['auth', 'verified', 'role:gestionnaire,admin'])
         Route::resource('maintenances', MaintenanceController::class)->names('maintenances');
 
         // Gestion 2 — Incidents
+        // Déclarées AVANT la ressource pour que « dashboard » et « map » ne
+        // soient pas capturés par la route incidents.show ({incident}).
+        Route::get('incidents/dashboard', [IncidentDashboardController::class, 'index'])
+            ->name('incidents.dashboard');
+        Route::get('incidents/dashboard/pdf', [IncidentDashboardController::class, 'pdf'])
+            ->name('incidents.dashboard.pdf');
+        Route::get('incidents/map', [IncidentMapController::class, 'index'])->name('incidents.map');
+        Route::get('incidents/map/data', [IncidentMapController::class, 'data'])->name('incidents.map.data');
         Route::resource('incidents', BackIncidentController::class)->names('incidents');
         Route::patch('incidents/{incident}/statut', [BackIncidentController::class, 'updateStatus'])
             ->name('incidents.status');
@@ -153,24 +165,49 @@ Route::middleware(['auth', 'verified', 'role:gestionnaire,admin'])
             ->only(['index', 'update', 'destroy'])
             ->parameters(['quality-alerts' => 'alert']);
 
+        // Planification des prélèvements — route calendrier déclarée AVANT la
+        // ressource pour ne pas être capturée par {planification}.
+        Route::get('quality-planifications/calendrier', [QualityPlanificationController::class, 'calendar'])
+            ->name('quality-planifications.calendar');
+        Route::resource('quality-planifications', QualityPlanificationController::class)
+            ->names('quality-planifications')
+            ->except(['show'])
+            ->parameters(['quality-planifications' => 'planification']);
+        Route::get('quality-zone-assignments', [QualityZoneAssignmentController::class, 'index'])
+            ->name('quality-assignments.index');
+        Route::put('quality-zone-assignments', [QualityZoneAssignmentController::class, 'update'])
+            ->name('quality-assignments.update');
+
         // Gestion 4 — Sécheresse, consommation et continuité de service
+        Route::get('water-levels/export/{format}', [WaterLevelController::class, 'export'])
+            ->name('water-levels.export');
         Route::resource('water-levels', WaterLevelController::class)
             ->names('water-levels')
             ->except(['show'])
             ->parameters(['water-levels' => 'level']);
+        
+        Route::get('consumption-readings/export/{format}', [ConsumptionReadingController::class, 'export'])
+            ->name('consumption-readings.export');
         Route::get('consumption-readings/previsions', [ConsumptionReadingController::class, 'forecast'])
             ->name('consumption-readings.forecast');
         Route::resource('consumption-readings', ConsumptionReadingController::class)
             ->names('consumption-readings')
             ->except(['show'])
             ->parameters(['consumption-readings' => 'reading']);
+        
+        Route::get('restrictions/export/{format}', [RestrictionController::class, 'export'])
+            ->name('restrictions.export');
         Route::resource('restrictions', RestrictionController::class)
             ->names('restrictions')
             ->except(['show']);
+        
+        Route::get('scheduled-cuts/export/{format}', [ScheduledCutController::class, 'export'])
+            ->name('scheduled-cuts.export');
         Route::resource('scheduled-cuts', ScheduledCutController::class)
             ->names('scheduled-cuts')
             ->except(['show'])
             ->parameters(['scheduled-cuts' => 'cut']);
+        
         Route::get('alert-subscriptions', [BackAlertSubscriptionController::class, 'index'])
             ->name('alert-subscriptions.index');
 

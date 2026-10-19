@@ -12,13 +12,15 @@ class DatabaseSeeder extends Seeder
     /**
      * Seed the application's database.
      *
-     * Aucun seeder de démonstration n'est appelé automatiquement. Lancez
-     * explicitement ceux dont vous avez besoin, par exemple :
-     *   php artisan db:seed --class=DemoUsersSeeder
-     *   php artisan db:seed --class=DemoDataSeeder
+     * Lance les comptes de démonstration puis le jeu de données complet.
+     * Les deux seeders s'arrêtent sans erreur si leur configuration est
+     * absente ou en production.
      */
     public function run(): void
     {
-        //
+        $this->call([
+            DemoUsersSeeder::class,
+            DemoDataSeeder::class,
+        ]);
     }
 }

@@ -1,0 +1,27 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "Data foundation for forecasting: Create migration for consumption_forecasts table, Eloquent model, and 24-month synthetic seeder to provide sufficient historical data for ML algorithm training.",
+  "status": "pending",
+  "steps": [
+    "Create migration 2026_10_18_XXX_create_consumption_forecasts_table.php with columns: id, zone_id (FK), forecast_month (DATE), prediction_m3 (DECIMAL 15,2), lower_bound (DECIMAL 15,2), upper_bound (DECIMAL 15,2), model_used ENUM('linear','holt_winters','seasonal'), mae (DECIMAL 8,4), created_at, updated_at. Add UNIQUE constraint on (zone_id, forecast_month).",
+    "Create app/Models/Drought/ConsumptionForecast.php with: fillable array, casts for decimal and date types, belongsTo(Zone) relation.",
+    "Create database/seeders/ConsumptionHistorySeeder.php to generate 24 months (Jan 2025 – Dec 2026) of realistic monthly consumption readings. Pattern: base consumption 10,000–50,000 m³ per zone (proportional to population), summer peak +20% (Jun–Aug), winter dip -10% (Dec–Feb), random ±5% variance per reading. Total: 5 zones × 24 months = 120 rows in consumption_readings table.",
+    "Run php artisan migrate to create consumption_forecasts table.",
+    "Run php artisan db:seed --class=ConsumptionHistorySeeder to populate historical data."
+  ],
+  "acceptance_criteria": [
+    "consumption_forecasts table exists with all required columns and correct types.",
+    "ConsumptionForecast model loads without errors and has Zone relation.",
+    "consumption_readings contains 120+ rows (5 zones × 24 months).",
+    "Verify via tinker: App\\Models\\Drought\\ConsumptionReading::count() >= 120."
+  ],
+  "verification": [
+    "php artisan migrate (no errors)",
+    "php artisan db:seed --class=ConsumptionHistorySeeder (completes successfully)",
+    "mysql -u root -e \"SELECT COUNT(*) FROM aquasecure.consumption_readings;\" (output: 120+)",
+    "mysql -u root -e \"SELECT COUNT(*) FROM aquasecure.consumption_forecasts;\" (output: 0, table exists but empty before forecast generation)"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

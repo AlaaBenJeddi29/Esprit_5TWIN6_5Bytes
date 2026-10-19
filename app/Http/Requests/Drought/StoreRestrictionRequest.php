@@ -14,7 +14,7 @@ class StoreRestrictionRequest extends BackOfficeRequest
     public function rules(): array
     {
         return [
-            'zone_id' => ['nullable', 'integer', 'exists:zones,id'],
+            'zone_id' => ['required', 'integer', 'exists:zones,id'],
             'type' => ['required', Rule::in(array_keys(Restriction::TYPES))],
             'titre' => ['required', 'string', 'max:180'],
             'description' => ['nullable', 'string', 'max:5000'],

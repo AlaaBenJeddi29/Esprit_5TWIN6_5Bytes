@@ -1,0 +1,26 @@
+{
+  "project_type": "Laravel 12 full-stack web application with Tailwind CSS 4, Alpine.js, Vite, MySQL 8",
+  "language": "PHP 8.2+, Blade templating, JavaScript (Chart.js)",
+  "build_system": "Composer (PHP) + npm (Node.js, Vite). Run: `composer install && npm install`",
+  "test_framework": "PHPUnit (configured for MySQL-only testing). Run: `php artisan config:clear && php artisan test`",
+  "build_command": "npm run build (Vite compilation); php artisan view:cache",
+  "test_command": "php artisan test (full suite) or php artisan test --filter=<pattern>",
+  "verification_instructions": "1. php artisan migrate (apply migrations). 2. php artisan db:seed --class=<SeederName> (populate data). 3. Navigate to /back/consumption-readings/previsions in browser or curl API endpoint. 4. Run console command: php artisan drought:refresh-forecasts. 5. Verify database: SELECT COUNT(*) FROM consumption_forecasts; should return >0.",
+  "snapshot_or_generated_files": "None. All data is in MySQL only. Chart.js graphs are generated client-side from data.",
+  "environment_constraints": "MySQL 8 only (not SQLite). Database queue driver active (php artisan queue:listen required for jobs). QUEUE_CONNECTION=database and CACHE_STORE=database in .env. API routes use public endpoints (no auth). All times in Laravel timezone (config/app.php). French month labels via Carbon::translatedFormat().",
+  "contribution_requirements": "No git commits (per user request). All files written to app/, routes/, database/, resources/ directly. Follow existing style: Tailwind CSS dark mode (dark:bg-white/[0.03]), x-back.* Blade components, numeric format with French locale (spaces for thousands).",
+  "key_patterns": "1. Controllers: Inject service via constructor, return view/JSON. 2. Models: HasFactory trait, relation methods, casts. 3. Services: Static helpers or dependency-injected; logic separated from HTTP. 4. Jobs: Implement ShouldQueue, dispatch via dispatchSync/dispatch. 5. Blade: Use translatedFormat() for dates, match() for conditionals, @foreach for loops. 6. Chart.js: Initialize via x-data Alpine binding or inline <script>. 7. Dark mode: Use dark: prefix in Tailwind classes.",
+  "relevant_files": [
+    "app/Services/DroughtAnalyzer.php (existing forecast logic to preserve)",
+    "app/Http/Controllers/Back/ConsumptionReadingController.php (add forecast data to view)",
+    "app/Models/Drought/ConsumptionReading.php (reference schema)",
+    "app/Models/Infrastructure/Zone.php (reference relations)",
+    "app/Jobs/SendSubscriptionConfirmationJob.php (job pattern)",
+    "database/migrations/2026_10_17_120012_create_consumption_readings_table.php (reference schema)",
+    "database/seeders/DroughtTestDataSeeder.php (seeder pattern)",
+    "resources/views/back/drought/consumption/forecast.blade.php (existing view to upgrade)",
+    "resources/views/back/layouts/app.blade.php (layout/theme setup)",
+    "routes/web.php (route patterns)"
+  ],
+  "directory_structure": "app/ (services, controllers, models, jobs), database/ (migrations, seeders, factories), routes/ (web.php + new api.php), resources/views/ (Blade templates organized by section), resources/js/ (Vite assets), config/ (Laravel configuration), storage/ (logs, cache), public/ (static assets)"
+}

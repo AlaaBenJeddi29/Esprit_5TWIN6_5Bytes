@@ -1,0 +1,28 @@
+{
+  "id": "FEAT-002",
+  "type": "feat",
+  "description": "Core forecasting engine: Implement Holt-Winters exponential smoothing algorithm in PHP, queued job for batch forecast generation, and Artisan console command with scheduling for automatic daily regeneration.",
+  "status": "pending",
+  "steps": [
+    "Create app/Services/ConsumptionForecastService.php with method predictNextMonths(Zone $zone, int $months = 6): array. Implement Holt-Winters (exponential smoothing with seasonality). Algorithm: (1) Initialize level L, trend T, seasonal factors S from first 12 months of historical data. (2) For each historical month, update L, T, S using smoothing parameters α=0.3, β=0.1, γ=0.1. (3) For each forecast month (1..6), compute prediction = (L + month×T) × S[seasonal_index]. (4) Confidence intervals: lower = prediction × 0.85, upper = prediction × 1.15. (5) Compute MAE on hold-out set (last 3 historical months predicted vs. actual). Return array: ['predictions' => [...], 'lower_bounds' => [...], 'upper_bounds' => [...], 'mae' => float, 'model' => 'holt_winters'].",
+    "Create app/Jobs/GenerateConsumptionForecasts.php implementing ShouldQueue. Constructor: receives Zone $zone. Handle method: (1) Call ConsumptionForecastService::predictNextMonths($zone, 6). (2) For each forecast month, upsert row into consumption_forecasts table with (zone_id, forecast_month, prediction_m3, lower_bound, upper_bound, model_used='holt_winters', mae). Use upsertUsing or firstOrCreate/update pattern.",
+    "Create app/Console/Commands/RefreshForecasts.php with command signature 'drought:refresh-forecasts'. In handle(): (1) Fetch all zones. (2) For each zone, dispatch GenerateConsumptionForecasts job or call it synchronously if fast. (3) Output: 'Forecasts regenerated for N zones.'",
+    "Modify app/Console/Kernel.php schedule(): Add line: $schedule->command('drought:refresh-forecasts')->dailyAt('23:00');",
+    "Test manually: php artisan drought:refresh-forecasts and verify consumption_forecasts table has rows for all zones."
+  ],
+  "acceptance_criteria": [
+    "ConsumptionForecastService correctly implements Holt-Winters and returns valid predictions with confidence intervals.",
+    "GenerateConsumptionForecasts job successfully upserts forecast data into DB.",
+    "RefreshForecasts command runs without errors and regenerates forecasts for all zones.",
+    "Kernel schedule includes the command with dailyAt('23:00').",
+    "consumption_forecasts table contains 30+ rows after running the command (5 zones × 6 months each)."
+  ],
+  "verification": [
+    "php artisan drought:refresh-forecasts (completes with success message)",
+    "mysql -u root -e \"SELECT COUNT(*) FROM aquasecure.consumption_forecasts;\" (output: 30 or more)",
+    "mysql -u root -e \"SELECT forecast_month, prediction_m3, model_used FROM aquasecure.consumption_forecasts LIMIT 5;\" (shows correct data)",
+    "php artisan schedule:list (shows 'drought:refresh-forecasts' with 'Daily at 23:00')"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

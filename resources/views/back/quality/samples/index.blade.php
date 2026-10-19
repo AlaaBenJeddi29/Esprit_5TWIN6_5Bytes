@@ -19,9 +19,74 @@
 
     <x-back.page-header title="Prélèvements qualité" desc="Analyses de l'eau distribuée, conformité et alertes générées.">
         <x-slot:action>
+            <a href="{{ route('back.quality-planifications.calendar') }}" class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-theme-xs transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">Calendrier</a>
+            <a href="{{ route('back.quality-planifications.index') }}" class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-theme-xs transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">Planifications</a>
             <a href="{{ route('back.quality-samples.create') }}" class="inline-flex items-center justify-center rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white shadow-theme-xs transition hover:bg-brand-600">Nouveau prélèvement</a>
         </x-slot:action>
     </x-back.page-header>
+
+    {{-- Rappels de planification --}}
+    <div class="mb-8">
+        <div class="mb-4 flex flex-wrap items-end justify-between gap-3">
+            <div>
+                <h2 class="text-base font-medium text-gray-800 dark:text-white/90">Rappels de planification</h2>
+                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Prochains contrôles prévus et retards sur les zones de votre périmètre.</p>
+            </div>
+            <a href="{{ route('back.quality-planifications.index') }}" class="text-sm font-medium text-brand-500 hover:underline dark:text-brand-400">Voir toutes les planifications</a>
+        </div>
+
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <x-back.stat-card label="Contrôles à venir" :value="$planningReminders['a_venir']" />
+            <x-back.stat-card label="Contrôles en retard" :value="$planningReminders['en_retard']" />
+            <x-back.stat-card label="Contrôles effectués" :value="$planningReminders['effectues']" />
+        </div>
+
+        <div class="mt-4 rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
+            <h3 class="text-sm font-semibold text-gray-800 dark:text-white/90">Prochains contrôles</h3>
+
+            @if ($planningReminders['prochains']->isEmpty())
+                <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">Aucun contrôle à venir.</p>
+            @else
+                <ul class="mt-3 divide-y divide-gray-100 dark:divide-gray-800">
+                    @foreach ($planningReminders['prochains'] as $prochain)
+                        <li class="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
+                            <span class="text-gray-700 dark:text-gray-300">
+                                {{ $prochain->date_prevue->format('d/m/Y') }} — {{ $prochain->zone?->nom }}
+                                <span class="text-gray-400">({{ $prochain->frequenceLabel() }})</span>
+                            </span>
+                            <a href="{{ route('back.quality-samples.create', ['planification' => $prochain->id]) }}" class="text-xs font-medium text-brand-500 hover:underline dark:text-brand-400">Enregistrer le prélèvement</a>
+                        </li>
+                    @endforeach
+                </ul>
+            @endif
+        </div>
+    </div>
+
+    {{-- Rapport PDF par zone --}}
+    <div class="mb-8 rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+                <h2 class="text-base font-medium text-gray-800 dark:text-white/90">Rapport PDF par zone</h2>
+                <p class="mt-1 max-w-2xl text-sm text-gray-500 dark:text-gray-400">Génère un rapport contenant uniquement les prélèvements, mesures, seuils, statuts et alertes de la zone sélectionnée.</p>
+            </div>
+
+            <form method="GET" action="{{ route('back.quality-samples.index') }}" class="flex flex-wrap items-end gap-2">
+                <input type="hidden" name="pdf" value="1">
+
+                <div>
+                    <label for="report-zone" class="mb-1 block text-sm text-gray-500 dark:text-gray-400">Zone</label>
+                    <select id="report-zone" name="perimetre" required class="{{ $inputClass }}">
+                        <option value="">Sélectionnez une zone…</option>
+                        @foreach ($zones as $zoneOption)
+                            <option value="{{ $zoneOption->id }}" @selected($perimetre?->id === $zoneOption->id)>{{ $zoneOption->nom }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <button type="submit" @disabled($zones->isEmpty()) class="inline-flex items-center justify-center rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white shadow-theme-xs transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50">Générer un rapport PDF</button>
+            </form>
+        </div>
+    </div>
 
     {{-- Tableau de bord --}}
     <div class="mb-8">

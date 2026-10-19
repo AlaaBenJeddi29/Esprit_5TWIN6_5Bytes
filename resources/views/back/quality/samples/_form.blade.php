@@ -1,7 +1,18 @@
 @php
     $isEdit = $sample->exists;
+    $planification = $planification ?? null;
     $inputClass = 'mt-1 block w-full rounded-lg border-gray-300 bg-transparent text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:text-white/90';
 @endphp
+
+@if ($planification)
+    <input type="hidden" name="planification_id" value="{{ $planification->id }}">
+
+    <div class="mb-5 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-brand-700 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-400">
+        Prélèvement du contrôle planifié du {{ $planification->date_prevue->format('d/m/Y') }}
+        ({{ $planification->frequenceLabel() }}) — zone {{ $planification->zone->nom }}.
+        Il ne sera marqué « effectué » qu'après l'enregistrement de ce prélèvement.
+    </div>
+@endif
 
 <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
     <div>

@@ -48,6 +48,7 @@ class IncidentFactory extends Factory
             'reported_at' => fake()->dateTimeBetween('-3 months', 'now'),
             'resolved_at' => null,
             'resolution_note' => null,
+            'rejection_reason' => null,
         ];
     }
 
@@ -56,7 +57,18 @@ class IncidentFactory extends Factory
         return $this->state(fn () => [
             'status' => 'traite',
             'resolved_at' => now(),
-            'resolution_note' => 'Intervention réalisée.',
+            'resolution_note' => 'Intervention réalisée, alimentation rétablie.',
+            'rejection_reason' => null,
+        ]);
+    }
+
+    public function rejete(): static
+    {
+        return $this->state(fn () => [
+            'status' => 'rejete',
+            'resolved_at' => null,
+            'resolution_note' => null,
+            'rejection_reason' => 'Signalement non recevable après vérification terrain.',
         ]);
     }
 

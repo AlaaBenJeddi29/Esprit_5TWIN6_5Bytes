@@ -255,22 +255,74 @@ class QualityAnalyzer
 
     /**
      * Prélèvements d'un périmètre, du plus ancien au plus récent, avec mesures et alertes.
+     * Un limite à null charge l'historique complet du périmètre.
      *
      * @return Collection<int, WaterQualitySample>
      */
-    public function zoneHistory(Zone $zone, int $limit = 20): Collection
+    public function zoneHistory(Zone $zone, ?int $limit = 20): Collection
     {
-        return WaterQualitySample::query()
+        $query = WaterQualitySample::query()
             ->where('zone_id', $zone->id)
             ->with([
                 'parameters' => fn ($query) => $query->orderBy('id'),
                 'alerts',
             ])
-            ->orderByDesc('date_prelevement')
-            ->limit(max(1, $limit))
+            ->orderByDesc('date_prelevement');
+
+        if ($limit !== null) {
+            $query->limit(max(1, $limit));
+        }
+
+        return $query
             ->get()
             ->sortBy(fn (WaterQualitySample $sample) => $sample->date_prelevement?->getTimestamp() ?? 0)
             ->values();
+    }
+
+    /**
+     * Données complètes d'un périmètre pour le rapport PDF.
+     * Toutes les requêtes sont strictement limitées à la zone fournie.
+     *
+     * @return array{
+     *     zone: Zone,
+     *     summary: array<string, mixed>,
+     *     latest: WaterQualitySample|null,
+     *     history: Collection<int, WaterQualitySample>,
+     *     alerts: Collection<int, WaterQualityAlert>,
+     *     trendDisponible: bool,
+     *     counts: array{total: int, conformes: int, non_conformes: int, en_attente: int},
+     *     firstDate: Carbon|null,
+     *     lastDate: Carbon|null
+     * }
+     */
+    public function zoneReport(Zone $zone): array
+    {
+        $history = $this->zoneHistory($zone, null);
+        $summary = $this->zoneSummary($zone);
+
+        $alerts = WaterQualityAlert::query()
+            ->where('zone_id', $zone->id)
+            ->with('sample')
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
+            ->get();
+
+        return [
+            'zone' => $zone,
+            'summary' => $summary,
+            'latest' => $summary['latest'],
+            'history' => $history,
+            'alerts' => $alerts,
+            'trendDisponible' => $history->take(-6)->whereNotNull('score')->count() >= 3,
+            'counts' => [
+                'total' => $history->count(),
+                'conformes' => $history->where('statut', 'conforme')->count(),
+                'non_conformes' => $history->where('statut', 'non_conforme')->count(),
+                'en_attente' => $history->where('statut', 'en_attente')->count(),
+            ],
+            'firstDate' => $history->first()?->date_prelevement,
+            'lastDate' => $history->last()?->date_prelevement,
+        ];
     }
 
     public function thresholdFor(WaterQualitySample $sample, string $parametre): ?QualityThreshold
