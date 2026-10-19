@@ -31,6 +31,7 @@ use App\Http\Controllers\Front\PublicDroughtController;
 use App\Http\Controllers\Front\PublicInfrastructureController;
 use App\Http\Controllers\Front\PublicQualityController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\StripeWebhookController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -65,6 +66,10 @@ Route::post('/projets/{project}/assistant', [FrontProjectController::class, 'ass
 // Suivi public d'un incident par référence
 Route::get('/suivi', [FrontIncidentController::class, 'trackForm'])->name('front.incidents.track.form');
 Route::post('/suivi', [FrontIncidentController::class, 'track'])->name('front.incidents.track');
+
+// Webhook Stripe Checkout : hors authentification, vérifié par signature
+// (CSRF exempté pour cette route uniquement — voir bootstrap/app.php).
+Route::post('/stripe/webhook', StripeWebhookController::class)->name('stripe.webhook');
 
 /*
 |--------------------------------------------------------------------------
@@ -106,6 +111,10 @@ Route::middleware(['auth', 'verified', 'role:citoyen'])
             ->name('subscriptions.destroy');
 
         Route::post('/projets/{project}/don', [FrontProjectController::class, 'donate'])->name('projects.donate');
+        Route::get('/projets/{project}/don/succes', [FrontProjectController::class, 'donationSuccess'])
+            ->name('projects.donation.success');
+        Route::get('/projets/{project}/don/annule', [FrontProjectController::class, 'donationCancel'])
+            ->name('projects.donation.cancel');
     });
 
 /*

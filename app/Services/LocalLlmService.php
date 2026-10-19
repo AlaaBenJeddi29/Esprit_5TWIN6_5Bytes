@@ -29,7 +29,7 @@ class LocalLlmService
      *
      * @param  string  $prompt  Prompt complet construit par l'appelant — les prompts
      *                          restent hors des contrôleurs et jamais journalisés.
-     * @param  array{model?: string, temperature?: float, timeout?: int, format?: string}  $options
+     * @param  array{model?: string, temperature?: float, timeout?: int, format?: string, max_tokens?: int}  $options
      * @return array{success: bool, texte: string, code: ?string, message: ?string}
      *                                                                              code : null | 'desactive' | 'hote_non_local' | 'indisponible' |
      *                                                                              'expiration' | 'statut_http' | 'reponse_invalide' | 'reponse_vide' | 'erreur'
@@ -62,6 +62,12 @@ class LocalLlmService
             if (isset($options['format'])) {
                 // Structuration locale de la sortie (ex. « json ») — Ollama uniquement.
                 $payload['format'] = (string) $options['format'];
+            }
+
+            if (isset($options['max_tokens'])) {
+                // Sans borne de sortie, une génération locale peut ne jamais s'arrêter :
+                // le modèle enchaîne les répétitions jusqu'à l'expiration du délai HTTP.
+                $payload['options']['num_predict'] = (int) $options['max_tokens'];
             }
 
             $reponse = Http::timeout((int) ($options['timeout'] ?? $config['timeout']))

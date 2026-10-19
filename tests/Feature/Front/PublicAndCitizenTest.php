@@ -145,22 +145,19 @@ class PublicAndCitizenTest extends TestCase
         $this->assertDatabaseCount('alert_subscriptions', 0);
     }
 
-    public function test_citizen_can_make_a_simulated_donation(): void
+    public function test_donation_is_refused_when_stripe_is_not_configured(): void
     {
+        config(['services.stripe.secret' => null]);
+
         $citizen = User::factory()->citoyen()->create();
         $project = Project::factory()->create(['statut' => 'en_cours']);
 
         $this->actingAs($citizen)
             ->post(route('citizen.projects.donate', $project), ['montant' => 250])
             ->assertRedirect(route('public.projects.show', $project))
-            ->assertSessionHas('success');
+            ->assertSessionHas('error');
 
-        $this->assertDatabaseHas('fundings', [
-            'project_id' => $project->id,
-            'source' => 'don',
-            'donateur_id' => $citizen->id,
-            'montant' => 250,
-        ]);
+        $this->assertDatabaseCount('fundings', 0);
     }
 
     public function test_donation_is_forbidden_for_gestionnaire_and_invalid_amount_rejected(): void

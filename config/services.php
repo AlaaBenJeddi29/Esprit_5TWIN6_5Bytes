@@ -87,4 +87,21 @@ return [
         'temperature' => (float) env('LOCAL_LLM_TEMPERATURE', 0.3),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Stripe Checkout — dons citoyens
+    |--------------------------------------------------------------------------
+    |
+    | Clés de TEST uniquement (sk_test_… / pk_test_…). Aucune valeur par
+    | défaut : sans STRIPE_SECRET (et STRIPE_WEBHOOK_SECRET pour le webhook),
+    | le paiement en ligne est refusé proprement sans débit possible.
+    |
+    */
+
+    'stripe' => [
+        'key' => env('STRIPE_KEY'),
+        'secret' => env('STRIPE_SECRET'),
+        'webhook_secret' => env('STRIPE_WEBHOOK_SECRET'),
+    ],
+
 ];

@@ -14,11 +14,20 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
+use Stripe\ApiRequestor;
+use Tests\Support\FakeStripeHttpClient;
 use Tests\TestCase;
 
 class AuditTrailTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function tearDown(): void
+    {
+        ApiRequestor::setHttpClient(null);
+
+        parent::tearDown();
+    }
 
     private function projectPayload(array $overrides = []): array
     {
@@ -211,12 +220,15 @@ class AuditTrailTest extends TestCase
 
     public function test_citizen_donation_is_logged_exactly_once(): void
     {
+        config(['services.stripe.secret' => 'sk_test_fake']);
+        ApiRequestor::setHttpClient(new FakeStripeHttpClient);
+
         $citizen = User::factory()->citoyen()->create();
         $project = Project::factory()->create(['statut' => 'en_cours']);
 
         $this->actingAs($citizen)
             ->post(route('citizen.projects.donate', $project), ['montant' => 75])
-            ->assertRedirect(route('public.projects.show', $project));
+            ->assertRedirect('https://checkout.stripe.test/pay/cs_test_123');
 
         $this->assertSame(1, AuditEvent::where('action', 'funding.created')->count());
 

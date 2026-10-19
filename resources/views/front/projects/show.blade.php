@@ -176,15 +176,15 @@
                                 <dd class="font-semibold text-dark dark:text-white">{{ number_format($metrics->fundingGap, 2, ',', ' ') }} €</dd>
                             </div>
                             <div class="flex justify-between gap-3">
-                                <dt class="text-body-color dark:text-dark-6">Dont dons simulés</dt>
+                                <dt class="text-body-color dark:text-dark-6">Dont dons citoyens</dt>
                                 <dd class="font-semibold text-dark dark:text-white">{{ number_format($donationsTotal, 2, ',', ' ') }} € ({{ $donationsCount }})</dd>
                             </div>
                         </dl>
 
                         <h3 class="mt-6 text-sm font-semibold uppercase tracking-wide text-body-color dark:text-dark-6">Sources de financement</h3>
-                        @forelse ($project->fundings as $funding)
+                        @forelse ($fundingsConfirmees as $funding)
                             <div class="flex items-center justify-between border-b border-stroke py-2 text-sm last:border-0 dark:border-dark-3">
-                                <span class="text-body-color dark:text-dark-6">{{ $funding->isDonation() ? 'Don citoyen (simulé)' : $funding->sourceLabel() }}</span>
+                                <span class="text-body-color dark:text-dark-6">{{ $funding->isDonation() ? 'Don citoyen' : $funding->sourceLabel() }}</span>
                                 <span class="font-medium text-dark dark:text-white">{{ number_format((float) $funding->montant, 2, ',', ' ') }} €</span>
                             </div>
                         @empty
@@ -192,22 +192,25 @@
                         @endforelse
                     </div>
 
-                    {{-- Don simulé --}}
+                    {{-- Don sécurisé par Stripe Checkout (mode test) --}}
                     @if ($project->statut !== 'annulé')
                         <div class="rounded-md bg-white p-6 shadow-1 dark:bg-dark-2">
                             <h2 class="text-lg font-bold text-dark dark:text-white">Soutenir ce projet</h2>
                             <p class="mt-1 text-xs text-body-color dark:text-dark-6">
-                                Don entièrement simulé : aucun paiement réel n'est effectué et aucune coordonnée bancaire n'est demandée.
+                                Paiement sécurisé par Stripe : vous serez redirigé vers Stripe Checkout. AquaSecure ne voit ni ne stocke aucune donnée de carte.
                             </p>
 
                             @if (auth()->check() && auth()->user()->isCitoyen())
                                 <form method="POST" action="{{ route('citizen.projects.donate', $project) }}" class="mt-4">
                                     @csrf
                                     <label for="montant" class="mb-2 block text-sm font-medium text-dark dark:text-white">Montant (€)</label>
-                                    <input type="text" id="montant" name="montant" value="{{ old('montant') }}"
+                                    <input type="text" id="montant" name="montant" value="{{ old('montant') }}" inputmode="decimal"
                                            class="{{ $inputClass }} @error('montant') border-red-500 @enderror" placeholder="25.00">
                                     @error('montant')<p class="mt-1 text-xs text-red-500">{{ $message }}</p>@enderror
-                                    <button type="submit" class="mt-3 w-full rounded-md bg-secondary px-5 py-2.5 text-sm font-medium text-white hover:bg-[#0BB489]">Faire un don simulé</button>
+                                    <p class="mt-1 text-xs text-body-color dark:text-dark-6">
+                                        De {{ number_format((float) config('donations.min_amount'), 2, ',', ' ') }} € à {{ number_format((float) config('donations.max_amount'), 2, ',', ' ') }} €.
+                                    </p>
+                                    <button type="submit" class="mt-3 w-full rounded-md bg-secondary px-5 py-2.5 text-sm font-medium text-white hover:bg-[#0BB489]">Donner avec Stripe</button>
                                 </form>
                             @else
                                 <a href="{{ route('login') }}" class="mt-4 inline-flex w-full items-center justify-center rounded-md border border-primary px-5 py-2.5 text-sm font-medium text-primary hover:bg-primary hover:text-white">

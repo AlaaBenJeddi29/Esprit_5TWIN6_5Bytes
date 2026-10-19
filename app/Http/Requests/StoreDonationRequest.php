@@ -17,7 +17,25 @@ class StoreDonationRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'montant' => ['required', 'numeric', 'min:1', 'max:1000000'],
+            'montant' => [
+                'required',
+                'numeric',
+                'decimal:0,2',
+                'min:'.config('donations.min_amount'),
+                'max:'.config('donations.max_amount'),
+            ],
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'montant.min' => 'Le montant minimum est de '.number_format((float) config('donations.min_amount'), 2, ',', ' ').' €.',
+            'montant.max' => 'Le montant maximum est de '.number_format((float) config('donations.max_amount'), 2, ',', ' ').' €.',
+            'montant.decimal' => 'Le montant ne peut pas comporter plus de deux décimales.',
         ];
     }
 }
