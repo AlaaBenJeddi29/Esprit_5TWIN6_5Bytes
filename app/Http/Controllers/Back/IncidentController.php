@@ -191,6 +191,19 @@ class IncidentController extends Controller
             ->with('success', "L'incident {$reference} a été supprimé.");
     }
 
+    public function showPhoto(Incident $incident, int $photoId): StreamedResponse
+    {
+        $photo = $incident->photos()->findOrFail($photoId);
+        $disk = Storage::disk('local');
+
+        abort_unless($disk->exists($photo->chemin_fichier), 404);
+
+        return $disk->response($photo->chemin_fichier, $photo->nom_original ?? basename($photo->chemin_fichier), [
+            'Content-Type' => $photo->mime_type ?: $disk->mimeType($photo->chemin_fichier),
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
+    }
+
     public function downloadPhoto(Incident $incident, int $photoId): StreamedResponse
     {
         $photo = $incident->photos()->findOrFail($photoId);

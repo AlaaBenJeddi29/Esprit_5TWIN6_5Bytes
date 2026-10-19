@@ -300,11 +300,24 @@
                         <h2 class="text-lg font-bold text-dark dark:text-white">Photos</h2>
 
                         @if ($incident->photos->isNotEmpty())
-                            <ul class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                            <ul class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                                 @foreach ($incident->photos as $photo)
-                                    <li class="rounded-md border border-stroke p-3 dark:border-dark-3">
-                                        <p class="truncate text-xs text-body-color dark:text-dark-6" title="{{ $photo->nom_original }}">{{ $photo->nom_original ?? basename($photo->chemin_fichier) }}</p>
-                                        <a href="{{ route('citizen.incidents.photos.download', [$incident, $photo->id]) }}" class="mt-2 inline-block text-xs font-medium text-primary hover:underline">Télécharger</a>
+                                    <li class="overflow-hidden rounded-md border border-stroke dark:border-dark-3">
+                                        <a href="{{ route('citizen.incidents.photos.show', [$incident, $photo->id]) }}" target="_blank" rel="noopener" class="group block bg-gray-1 dark:bg-dark-3" title="Agrandir la photo">
+                                            <img
+                                                src="{{ route('citizen.incidents.photos.show', [$incident, $photo->id]) }}"
+                                                alt="Photo du signalement {{ $incident->reference }}"
+                                                class="aspect-[4/3] w-full object-cover transition duration-300 group-hover:scale-[1.02]"
+                                                loading="lazy"
+                                            >
+                                        </a>
+                                        <div class="flex flex-wrap items-center justify-between gap-3 p-4">
+                                            <p class="min-w-0 flex-1 truncate text-sm text-body-color dark:text-dark-6" title="{{ $photo->nom_original }}">{{ $photo->nom_original ?? basename($photo->chemin_fichier) }}</p>
+                                            <div class="flex shrink-0 items-center gap-3">
+                                                <a href="{{ route('citizen.incidents.photos.show', [$incident, $photo->id]) }}" target="_blank" rel="noopener" class="text-sm font-medium text-primary hover:underline">Agrandir</a>
+                                                <a href="{{ route('citizen.incidents.photos.download', [$incident, $photo->id]) }}" class="text-sm font-medium text-body-color hover:underline dark:text-dark-6">Télécharger</a>
+                                            </div>
+                                        </div>
                                     </li>
                                 @endforeach
                             </ul>

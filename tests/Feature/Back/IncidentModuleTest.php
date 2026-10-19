@@ -4,6 +4,7 @@ namespace Tests\Feature\Back;
 
 use App\Models\Incident\Incident;
 use App\Models\Incident\IncidentComment;
+use App\Models\Incident\IncidentPhoto;
 use App\Models\Incident\IncidentStatusHistory;
 use App\Models\Infrastructure\Zone;
 use App\Models\User;
@@ -233,6 +234,71 @@ class IncidentModuleTest extends TestCase
         $photo = $incident->photos()->firstOrFail();
 
         Storage::disk('local')->assertExists($photo->chemin_fichier);
+    }
+
+    public function test_incident_detail_displays_photo_thumbnails_and_owner_can_preview(): void
+    {
+        Storage::fake('local');
+
+        $citizen = User::factory()->citoyen()->create();
+        $incident = Incident::factory()->create(['user_id' => $citizen->id]);
+        $photo = $this->photoFor($incident);
+
+        $this->actingAs($citizen)
+            ->get(route('citizen.incidents.show', $incident))
+            ->assertOk()
+            ->assertSee('<img', false)
+            ->assertSee(route('citizen.incidents.photos.show', [$incident, $photo->id]), false);
+
+        $this->actingAs($citizen)
+            ->get(route('citizen.incidents.photos.show', [$incident, $photo->id]))
+            ->assertOk()
+            ->assertHeader('content-type', 'image/jpeg')
+            ->assertHeader('x-content-type-options', 'nosniff');
+    }
+
+    public function test_photo_preview_is_restricted_to_the_owner_and_back_office(): void
+    {
+        Storage::fake('local');
+
+        $citizen = User::factory()->citoyen()->create();
+        $incident = Incident::factory()->create(['user_id' => $citizen->id]);
+        $photo = $this->photoFor($incident);
+        $otherCitizen = User::factory()->citoyen()->create();
+        $manager = $this->gestionnaire();
+
+        $this->actingAs($otherCitizen)
+            ->get(route('citizen.incidents.photos.show', [$incident, $photo->id]))
+            ->assertForbidden();
+
+        $this->actingAs($citizen)
+            ->get(route('back.incidents.photos.show', [$incident, $photo->id]))
+            ->assertForbidden();
+
+        $this->actingAs($manager)
+            ->get(route('back.incidents.show', $incident))
+            ->assertOk()
+            ->assertSee('<img', false)
+            ->assertSee(route('back.incidents.photos.show', [$incident, $photo->id]), false);
+
+        $this->actingAs($manager)
+            ->get(route('back.incidents.photos.show', [$incident, $photo->id]))
+            ->assertOk()
+            ->assertHeader('content-type', 'image/jpeg');
+    }
+
+    private function photoFor(Incident $incident): IncidentPhoto
+    {
+        $path = UploadedFile::fake()
+            ->create('fuite.jpg', 100, 'image/jpeg')
+            ->store("incidents/{$incident->id}", 'local');
+
+        return $incident->photos()->create([
+            'chemin_fichier' => $path,
+            'nom_original' => 'fuite.jpg',
+            'mime_type' => 'image/jpeg',
+            'taille' => 100,
+        ]);
     }
 
     public function test_citizen_cannot_comment_on_another_incident(): void

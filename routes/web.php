@@ -99,6 +99,8 @@ Route::middleware(['auth', 'verified', 'role:citoyen'])
             ->name('incidents.comments.store');
         Route::post('/mes-incidents/{incident}/photos', [FrontIncidentController::class, 'storePhoto'])
             ->name('incidents.photos.store');
+        Route::get('/mes-incidents/{incident}/photos/{photo}', [FrontIncidentController::class, 'showPhoto'])
+            ->name('incidents.photos.show');
         Route::get('/mes-incidents/{incident}/photos/{photo}/telecharger', [FrontIncidentController::class, 'downloadPhoto'])
             ->name('incidents.photos.download');
 
@@ -156,6 +158,8 @@ Route::middleware(['auth', 'verified', 'role:gestionnaire,admin'])
             ->name('incidents.status');
         Route::post('incidents/{incident}/commentaires', [BackIncidentController::class, 'storeComment'])
             ->name('incidents.comments.store');
+        Route::get('incidents/{incident}/photos/{photo}', [BackIncidentController::class, 'showPhoto'])
+            ->name('incidents.photos.show');
         Route::get('incidents/{incident}/photos/{photo}/telecharger', [BackIncidentController::class, 'downloadPhoto'])
             ->name('incidents.photos.download');
 

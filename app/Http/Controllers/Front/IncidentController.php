@@ -170,6 +170,21 @@ class IncidentController extends Controller
         return back()->with('success', 'La photo a été ajoutée au signalement.');
     }
 
+    public function showPhoto(Request $request, Incident $incident, int $photoId): StreamedResponse
+    {
+        Gate::authorize('view', $incident);
+
+        $photo = $incident->photos()->findOrFail($photoId);
+        $disk = Storage::disk('local');
+
+        abort_unless($disk->exists($photo->chemin_fichier), 404);
+
+        return $disk->response($photo->chemin_fichier, $photo->nom_original ?? basename($photo->chemin_fichier), [
+            'Content-Type' => $photo->mime_type ?: $disk->mimeType($photo->chemin_fichier),
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
+    }
+
     public function downloadPhoto(Request $request, Incident $incident, int $photoId): StreamedResponse
     {
         Gate::authorize('view', $incident);

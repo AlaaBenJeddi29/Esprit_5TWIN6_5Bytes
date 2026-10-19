@@ -118,7 +118,16 @@
       "Bash(grep -rn \"Impossible de supprimer la zone\\\\|cascades to infrastructures\\\\|zones.destroy\" tests/Feature/Back/InfrastructureModuleTest.php | head -20)",
       "Bash(php artisan view:cache 2>&1 | tail -3 && php artisan view:clear 2>&1 | tail -2 && php artisan test tests/Feature/Back/ComplaintWorkflowTest.php 2>&1 | tail -5 && vendor/bin/pint tests/Feature/Back/ComplaintWorkflowTest.php 2>&1 | tail -4)",
       "Bash(npm run build 2>&1 | tail -6)",
-      "Bash(php artisan test tests/Unit/ComplaintWorkflowRulesTest.php tests/Feature/Front/CitizenFeedbackTest.php tests/Feature/Back/ComplaintWorkflowTest.php tests/Feature/Back/SatisfactionStatsTest.php tests/Feature/Back/IncidentWorkflowTest.php 2>&1 | tail -6)"
+      "Bash(php artisan test tests/Unit/ComplaintWorkflowRulesTest.php tests/Feature/Front/CitizenFeedbackTest.php tests/Feature/Back/ComplaintWorkflowTest.php tests/Feature/Back/SatisfactionStatsTest.php tests/Feature/Back/IncidentWorkflowTest.php 2>&1 | tail -6)",
+      "Bash(grep -n -i \"photo\" resources/views/front/incidents/show.blade.php | head -40; echo ---BACK---; grep -n -i \"photo\" resources/views/back/incidents/show.blade.php | head -40)",
+      "Bash(cat app/Http/Requests/Incident/StoreIncidentPhotoRequest.php; echo ---; grep -n \"function show\" -A25 app/Http/Controllers/Back/IncidentController.php | head -35; echo ---; sed -n '290,325p' resources/views/front/incidents/show.blade.php; echo ---BACK---; sed -n '178,205p' resources/views/back/incidents/show.blade.php)",
+      "Bash(grep -n \"col-span\\\\|xl:col-span\\\\|grid-cols\" resources/views/back/incidents/show.blade.php | head -20; echo ---; sed -n '120,190p' resources/views/back/incidents/show.blade.php)",
+      "Bash(grep -n \"photo\" -B3 -A25 tests/Feature/Back/IncidentModuleTest.php | head -80; echo ---; grep -n \"photos\" routes/web.php)",
+      "Bash(php artisan test tests/Feature/Back/IncidentModuleTest.php 2>&1 | tail -30)",
+      "Bash(php artisan route:list --name=photos 2>&1 | sed -n '1,20p'; echo ---; php artisan view:cache 2>&1 | tail -3 && php artisan view:clear 2>&1 | tail -2)",
+      "Bash(vendor/bin/pint app/Http/Controllers/Front/IncidentController.php app/Http/Controllers/Back/IncidentController.php routes/web.php tests/Feature/Back/IncidentModuleTest.php 2>&1 | tail -8 && npm run build 2>&1 | tail -5)",
+      "Bash(php artisan test tests/Feature/Back/IncidentModuleTest.php tests/Feature/Back/IncidentWorkflowTest.php 2>&1 | tail -5)",
+      "Bash(php artisan view:cache 2>&1 | tail -3 && php artisan view:clear 2>&1 | tail -2 && php artisan test tests/Feature/Back/IncidentModuleTest.php 2>&1 | tail -5 && npm run build 2>&1 | tail -5)"
     ]
   }
 }
