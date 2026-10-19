@@ -12,9 +12,9 @@
     </div>
 
     <div>
-        <label for="zone_id" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Zone</label>
-        <select id="zone_id" name="zone_id" class="{{ $inputClass }} @error('zone_id') border-error-400 dark:border-error-500 @enderror">
-            <option value="">— Toutes les zones —</option>
+        <label for="zone_id" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Zone <span class="text-error-500">*</span></label>
+        <select id="zone_id" name="zone_id" required class="{{ $inputClass }} @error('zone_id') border-error-400 dark:border-error-500 @enderror">
+            <option value="">— Sélectionnez une zone —</option>
             @foreach ($zones as $zone)
                 <option value="{{ $zone->id }}" @selected((int) old('zone_id', $restriction->zone_id) === $zone->id)>{{ $zone->nom }}</option>
             @endforeach

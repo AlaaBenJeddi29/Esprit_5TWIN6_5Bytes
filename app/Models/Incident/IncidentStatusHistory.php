@@ -18,6 +18,8 @@ class IncidentStatusHistory extends Model
         'ancien_statut',
         'nouveau_statut',
         'comment',
+        'resolution_note',
+        'rejection_reason',
     ];
 
     public function incident(): BelongsTo

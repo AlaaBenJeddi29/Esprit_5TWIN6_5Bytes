@@ -92,21 +92,36 @@ class IncidentModuleTest extends TestCase
 
         $this->actingAs($gestionnaire)
             ->patch(route('back.incidents.status', $incident), [
+                'status' => 'en_cours',
+                'comment' => 'Prise en charge par l\'équipe technique.',
+            ])
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $this->actingAs($gestionnaire)
+            ->patch(route('back.incidents.status', $incident), [
                 'status' => 'traite',
                 'comment' => 'Intervention terminée.',
-                'resolution_note' => 'Fuite colmatée.',
+                'resolution_note' => 'Fuite colmatée sur la conduite principale.',
             ])
-            ->assertRedirect();
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
 
         $incident->refresh();
 
         $this->assertSame('traite', $incident->status);
         $this->assertNotNull($incident->resolved_at);
-        $this->assertSame('Fuite colmatée.', $incident->resolution_note);
+        $this->assertSame('Fuite colmatée sur la conduite principale.', $incident->resolution_note);
         $this->assertDatabaseHas('incident_status_histories', [
             'incident_id' => $incident->id,
             'ancien_statut' => 'nouveau',
+            'nouveau_statut' => 'en_cours',
+        ]);
+        $this->assertDatabaseHas('incident_status_histories', [
+            'incident_id' => $incident->id,
+            'ancien_statut' => 'en_cours',
             'nouveau_statut' => 'traite',
+            'resolution_note' => 'Fuite colmatée sur la conduite principale.',
         ]);
     }
 

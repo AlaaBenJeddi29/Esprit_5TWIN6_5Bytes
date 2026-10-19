@@ -8,6 +8,7 @@ use App\Models\Quality\WaterQualityAlert;
 use App\Models\Quality\WaterQualityParameter;
 use App\Models\Quality\WaterQualitySample;
 use App\Models\User;
+use App\Services\QualityAnalyzer;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
@@ -690,6 +691,180 @@ class QualityModuleTest extends TestCase
             ->assertDontSee('En dégradation');
 
         $response->assertViewHas('trendDisponible', false);
+    }
+
+    public function test_quality_back_office_exposes_pdf_report_controls(): void
+    {
+        $gestionnaire = $this->gestionnaire();
+        Zone::factory()->create(['nom' => 'Zone PDF']);
+
+        $this->actingAs($gestionnaire)
+            ->get(route('back.quality-samples.index'))
+            ->assertOk()
+            ->assertSee('Rapport PDF par zone')
+            ->assertSee('Générer un rapport PDF')
+            ->assertSee('Zone PDF')
+            ->assertSee('name="pdf" value="1"', false);
+    }
+
+    public function test_gestionnaire_can_download_a_zone_pdf_report(): void
+    {
+        $gestionnaire = $this->gestionnaire();
+        $zone = Zone::factory()->create(['nom' => 'Zone Rapport']);
+
+        $sample = WaterQualitySample::factory()->nonConforme()->create([
+            'zone_id' => $zone->id,
+            'date_prelevement' => '2026-10-06 10:30:00',
+        ]);
+        WaterQualityParameter::factory()->nonConforme()->create([
+            'sample_id' => $sample->id,
+            'parametre' => 'turbidite',
+            'valeur' => 9.5,
+            'unite' => 'NTU',
+            'seuil_min' => 0,
+            'seuil_max' => 5,
+        ]);
+        WaterQualityAlert::factory()->create([
+            'sample_id' => $sample->id,
+            'zone_id' => $zone->id,
+            'parametre' => 'turbidite',
+            'statut' => 'active',
+        ]);
+
+        $response = $this->actingAs($gestionnaire)->get(route('back.quality-samples.index', [
+            'pdf' => 1,
+            'perimetre' => $zone->id,
+        ]));
+
+        $response->assertOk()
+            ->assertHeader('content-type', 'application/pdf')
+            ->assertDownload('rapport-qualite-zone-rapport-'.now()->format('Ymd').'.pdf');
+
+        $this->assertStringStartsWith('%PDF-', (string) $response->getContent());
+        $this->assertGreaterThan(1000, strlen((string) $response->getContent()));
+    }
+
+    public function test_pdf_report_requires_a_valid_zone(): void
+    {
+        $gestionnaire = $this->gestionnaire();
+
+        $this->actingAs($gestionnaire)
+            ->from(route('back.quality-samples.index'))
+            ->get(route('back.quality-samples.index', ['pdf' => 1]))
+            ->assertRedirect(route('back.quality-samples.index'))
+            ->assertSessionHasErrors('perimetre');
+
+        $this->actingAs($gestionnaire)
+            ->from(route('back.quality-samples.index'))
+            ->get(route('back.quality-samples.index', ['pdf' => 1, 'perimetre' => 999999]))
+            ->assertRedirect(route('back.quality-samples.index'))
+            ->assertSessionHasErrors('perimetre');
+    }
+
+    public function test_pdf_report_is_refused_for_a_zone_without_samples(): void
+    {
+        $gestionnaire = $this->gestionnaire();
+        $zone = Zone::factory()->create(['nom' => 'Zone Vide PDF']);
+
+        $this->actingAs($gestionnaire)
+            ->from(route('back.quality-samples.index'))
+            ->get(route('back.quality-samples.index', ['pdf' => 1, 'perimetre' => $zone->id]))
+            ->assertRedirect(route('back.quality-samples.index', ['perimetre' => $zone->id]))
+            ->assertSessionHas('error', fn (string $message) => str_contains($message, 'Aucun prélèvement'));
+    }
+
+    public function test_quality_pdf_report_data_is_scoped_to_the_selected_zone(): void
+    {
+        $zoneA = Zone::factory()->create(['nom' => 'Zone Alpha']);
+        $zoneB = Zone::factory()->create(['nom' => 'Zone Bêta']);
+
+        $olderA = WaterQualitySample::factory()->conforme()->create([
+            'zone_id' => $zoneA->id,
+            'date_prelevement' => '2026-10-01 08:00:00',
+        ]);
+        WaterQualityParameter::factory()->create([
+            'sample_id' => $olderA->id,
+            'parametre' => 'ph',
+            'valeur' => 7.2,
+            'unite' => 'pH',
+            'seuil_min' => 6.5,
+            'seuil_max' => 8.5,
+            'est_conforme' => true,
+        ]);
+
+        $newerA = WaterQualitySample::factory()->nonConforme()->create([
+            'zone_id' => $zoneA->id,
+            'date_prelevement' => '2026-10-04 09:15:00',
+        ]);
+        WaterQualityParameter::factory()->nonConforme()->create([
+            'sample_id' => $newerA->id,
+            'parametre' => 'turbidite',
+            'valeur' => 9.5,
+            'unite' => 'NTU',
+            'seuil_min' => 0,
+            'seuil_max' => 5,
+        ]);
+        WaterQualityAlert::factory()->create([
+            'sample_id' => $newerA->id,
+            'zone_id' => $zoneA->id,
+            'parametre' => 'turbidite',
+            'statut' => 'active',
+        ]);
+
+        $sampleB = WaterQualitySample::factory()->conforme()->create([
+            'zone_id' => $zoneB->id,
+            'date_prelevement' => '2026-10-02 08:00:00',
+        ]);
+        WaterQualityParameter::factory()->create([
+            'sample_id' => $sampleB->id,
+            'parametre' => 'plomb',
+            'valeur' => 2.0,
+            'unite' => 'µg/L',
+            'est_conforme' => true,
+        ]);
+        WaterQualityAlert::factory()->create([
+            'sample_id' => $sampleB->id,
+            'zone_id' => $zoneB->id,
+            'parametre' => 'plomb',
+        ]);
+
+        $report = app(QualityAnalyzer::class)->zoneReport($zoneA);
+
+        $this->assertSame([$olderA->reference, $newerA->reference], $report['history']->pluck('reference')->all());
+        $this->assertSame([$zoneA->id], $report['history']->pluck('zone_id')->unique()->values()->all());
+        $this->assertSame([$zoneA->id], $report['alerts']->pluck('zone_id')->unique()->values()->all());
+        $this->assertSame($newerA->id, $report['latest']?->id);
+        $this->assertSame(2, $report['counts']['total']);
+        $this->assertSame(1, $report['counts']['conformes']);
+        $this->assertSame(1, $report['counts']['non_conformes']);
+        $this->assertFalse($report['trendDisponible']);
+
+        $html = view('back.quality.reports.pdf', $report + [
+            'generatedAt' => now(),
+            'author' => 'Testeur',
+        ])->render();
+
+        $this->assertStringContainsString('Zone Alpha', $html);
+        $this->assertStringContainsString($olderA->reference, $html);
+        $this->assertStringContainsString($newerA->reference, $html);
+        $this->assertStringContainsString('Turbidité', $html);
+        $this->assertStringContainsString('6,5 – 8,5 pH', $html);
+        $this->assertStringNotContainsString('Zone Bêta', $html);
+        $this->assertStringNotContainsString($sampleB->reference, $html);
+        $this->assertStringNotContainsString('Plomb', $html);
+        $this->assertStringNotContainsString('µg/L', $html);
+
+        $gestionnaire = $this->gestionnaire();
+
+        $this->actingAs($gestionnaire)->get(route('back.quality-samples.index', [
+            'pdf' => 1,
+            'perimetre' => $zoneA->id,
+        ]))->assertOk()->assertDownload();
+
+        $this->actingAs($gestionnaire)->get(route('back.quality-samples.index', [
+            'pdf' => 1,
+            'perimetre' => $zoneB->id,
+        ]))->assertOk()->assertDownload();
     }
 
     public function test_public_zone_page_displays_parameter_evolution_for_that_zone_only(): void

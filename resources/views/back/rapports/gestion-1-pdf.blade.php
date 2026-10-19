@@ -95,7 +95,7 @@ $m       = $donnees['maintenances'];
 $maxMens = $m['couts_mensuels'] !== [] ? max(array_merge(array_values($m['couts_mensuels']), [0.01])) : 0.01;
 $maxZone = array_reduce($m['couts_par_zone'], fn ($acc, $z) => max($acc, (float) $z['cout']), 0.01);
 
-$dateGen = now()->translatedFormat('d F Y') . ' à ' . now()->format('H:i');
+$dateGen = now()->locale('fr')->translatedFormat('d F Y') . ' à ' . now()->format('H:i');
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -531,7 +531,7 @@ $dateGen = now()->translatedFormat('d F Y') . ' à ' . now()->format('H:i');
             <tbody>
                 @foreach ($m['couts_mensuels'] as $moisClef => $coutMois)
                     @php
-                        $dateMois = \Illuminate\Support\Carbon::createFromFormat('Y-m', $moisClef);
+                        $dateMois = \Illuminate\Support\Carbon::createFromFormat('Y-m', $moisClef)->locale('fr');
                         $largMens = $maxMens > 0 ? min(100, round($coutMois / $maxMens * 100)) : 0;
                     @endphp
                     <tr>

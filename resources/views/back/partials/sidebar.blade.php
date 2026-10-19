@@ -23,16 +23,51 @@
         [
             'title' => 'Gestion 2 — Incidents',
             'items' => [
-                ['label' => 'Incidents', 'route' => 'back.incidents.index', 'pattern' => 'back.incidents.*', 'icon' => 'report'],
+                [
+                    'label' => 'Incidents',
+                    'route' => 'back.incidents.index',
+                    'pattern' => [
+                        'back.incidents.index',
+                        'back.incidents.create',
+                        'back.incidents.store',
+                        'back.incidents.show',
+                        'back.incidents.edit',
+                        'back.incidents.update',
+                        'back.incidents.destroy',
+                        'back.incidents.status',
+                        'back.incidents.comments.store',
+                        'back.incidents.photos.download',
+                    ],
+                    'icon' => 'report',
+                ],
+                ['label' => 'Carte des incidents', 'route' => 'back.incidents.map', 'pattern' => 'back.incidents.map', 'icon' => 'map'],
+                ['label' => 'Indicateurs', 'route' => 'back.incidents.dashboard', 'pattern' => 'back.incidents.dashboard*', 'icon' => 'chart'],
             ],
         ],
         [
             'title' => "Gestion 3 — Qualité de l'eau",
-            'items' => [
+            'items' => array_values(array_filter([
                 ['label' => 'Prélèvements', 'route' => 'back.quality-samples.index', 'pattern' => 'back.quality-samples.*', 'icon' => 'quality'],
+                [
+                    'label' => 'Planifications',
+                    'route' => 'back.quality-planifications.index',
+                    'pattern' => [
+                        'back.quality-planifications.index',
+                        'back.quality-planifications.create',
+                        'back.quality-planifications.store',
+                        'back.quality-planifications.edit',
+                        'back.quality-planifications.update',
+                        'back.quality-planifications.destroy',
+                    ],
+                    'icon' => 'threshold',
+                ],
+                ['label' => 'Calendrier', 'route' => 'back.quality-planifications.calendar', 'pattern' => 'back.quality-planifications.calendar', 'icon' => 'cuts'],
                 ['label' => 'Seuils', 'route' => 'back.quality-thresholds.index', 'pattern' => 'back.quality-thresholds.*', 'icon' => 'threshold'],
                 ['label' => 'Alertes', 'route' => 'back.quality-alerts.index', 'pattern' => 'back.quality-alerts.*', 'icon' => 'alert'],
-            ],
+                $user?->isAdmin()
+                    ? ['label' => 'Affectations zones', 'route' => 'back.quality-assignments.index', 'pattern' => 'back.quality-assignments.*', 'icon' => 'zones']
+                    : null,
+            ])),
         ],
         [
             'title' => 'Gestion 4 — Sécheresse',
@@ -58,6 +93,8 @@
     $icons = [
         'dashboard' => '<svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" clip-rule="evenodd" d="M5.5 3.25C4.25736 3.25 3.25 4.25736 3.25 5.5V8.99998C3.25 10.2426 4.25736 11.25 5.5 11.25H9C10.2426 11.25 11.25 10.2426 11.25 8.99998V5.5C11.25 4.25736 10.2426 3.25 9 3.25H5.5ZM4.75 5.5C4.75 5.08579 5.08579 4.75 5.5 4.75H9C9.41421 4.75 9.75 5.08579 9.75 5.5V8.99998C9.75 9.41419 9.41421 9.74998 9 9.74998H5.5C5.08579 9.74998 4.75 9.41419 4.75 8.99998V5.5ZM5.5 12.75C4.25736 12.75 3.25 13.7574 3.25 15V18.5C3.25 19.7426 4.25736 20.75 5.5 20.75H9C10.2426 20.75 11.25 19.7427 11.25 18.5V15C11.25 13.7574 10.2426 12.75 9 12.75H5.5ZM4.75 15C4.75 14.5858 5.08579 14.25 5.5 14.25H9C9.41421 14.25 9.75 14.5858 9.75 15V18.5C9.75 18.9142 9.41421 19.25 9 19.25H5.5C5.08579 19.25 4.75 18.9142 4.75 18.5V15ZM12.75 5.5C12.75 4.25736 13.7574 3.25 15 3.25H18.5C19.7426 3.25 20.75 4.25736 20.75 5.5V8.99998C20.75 10.2426 19.7426 11.25 18.5 11.25H15C13.7574 11.25 12.75 10.2426 12.75 8.99998V5.5ZM15 4.75C14.5858 4.75 14.25 5.08579 14.25 5.5V8.99998C14.25 9.41419 14.5858 9.74998 15 9.74998H18.5C18.9142 9.74998 19.25 9.41419 19.25 8.99998V5.5C19.25 5.08579 18.9142 4.75 18.5 4.75H15ZM15 12.75C13.7574 12.75 12.75 13.7574 12.75 15V18.5C12.75 19.7426 13.7574 20.75 15 20.75H18.5C19.7426 20.75 20.75 19.7427 20.75 18.5V15C20.75 13.7574 19.7426 12.75 18.5 12.75H15ZM14.25 15C14.25 14.5858 14.5858 14.25 15 14.25H18.5C18.9142 14.25 19.25 14.5858 19.25 15V18.5C19.25 18.9142 18.9142 19.25 18.5 19.25H15C14.5858 19.25 14.25 18.9142 14.25 18.5V15Z" fill="currentColor"/></svg>',
         'report' => '<svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 9v3.75m0 3h.008M10.29 3.86 1.82 18a1.5 1.5 0 0 0 1.29 2.25h17.78a1.5 1.5 0 0 0 1.29-2.25L13.71 3.86a1.5 1.5 0 0 0-2.58 0Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        'map' => '<svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        'chart' => '<svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625Zm6.75-4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3.375 21 3.879 21 4.5v15.375c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.5Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
         'users' => '<svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
         'zones' => '<svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9 6.75V15m6-6v8.25m.503 3.498 4.875-2.437c.381-.19.622-.58.622-1.006V4.82c0-.836-.88-1.38-1.628-1.006l-3.869 1.934c-.317.159-.69.159-1.006 0L9.503 3.252a1.125 1.125 0 0 0-1.006 0L3.622 5.689C3.24 5.88 3 6.27 3 6.695V19.18c0 .836.88 1.38 1.628 1.006l3.869-1.934c.317-.159.69-.159 1.006 0l4.994 2.497c.317.158.69.158 1.006 0Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
         'infrastructure' => '<svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 3v6m12-6v6M6 9h12M6 9v3a6 6 0 0 0 12 0V9M12 18v3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',

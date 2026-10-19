@@ -12,15 +12,36 @@ class DatabaseSeeder extends Seeder
     /**
      * Seed the application's database with the demo dataset.
      *
-     * DemoUsersSeeder runs first : DemoDataSeeder bails without an existing
-     * gestionnaire/admin account. Each seeder self-guards and skips in production.
+     * Les seeders sont appelés dans l'ordre des dépendances :
+     * utilisateurs et zones référentielles d'abord, puis infrastructures,
+     * maintenances et enfin les jeux de données qui référencent ces entités.
+     * Chaque seeder s'auto-protège et s'arrête sans erreur si sa configuration
+     * est absente ou en production.
      */
     public function run(): void
     {
         $this->call([
+            // Utilisateurs (comptes de démonstration et administrateur)
+            AdminUserSeeder::class,
             DemoUsersSeeder::class,
+
+            // Référentiels : zones puis infrastructures rattachées aux zones
+            ZoneSeeder::class,
+            InfrastructureSeeder::class,
+
+            // Maintenances : dépendent des infrastructures et d'un utilisateur back-office
+            MaintenanceSeeder::class,
+
+            // Jeu de données complet toutes gestions (projets, incidents, qualité, sécheresse)
             DemoDataSeeder::class,
+
+            // Signalements de démonstration
             ReportSeeder::class,
+
+            // Données de test de la gestion sécheresse (dépendent des zones)
+            ZoneTestSeeder::class,
+            DroughtTestDataSeeder::class,
+            ConsumptionHistorySeeder::class,
         ]);
     }
 }

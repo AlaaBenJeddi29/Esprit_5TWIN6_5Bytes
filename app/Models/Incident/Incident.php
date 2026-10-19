@@ -2,9 +2,11 @@
 
 namespace App\Models\Incident;
 
+use App\Exceptions\InvalidIncidentTransitionException;
 use App\Models\Infrastructure\Infrastructure;
 use App\Models\Infrastructure\Zone;
 use App\Models\User;
+use App\Services\IncidentWorkflowService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -71,6 +73,7 @@ class Incident extends Model
         'reported_at',
         'resolved_at',
         'resolution_note',
+        'rejection_reason',
     ];
 
     protected function casts(): array
@@ -147,7 +150,9 @@ class Incident extends Model
 
     public function statusHistories(): HasMany
     {
-        return $this->hasMany(IncidentStatusHistory::class)->latest();
+        return $this->hasMany(IncidentStatusHistory::class)
+            ->orderBy('created_at')
+            ->orderBy('id');
     }
 
     public function scopeOpen(Builder $query): Builder
@@ -191,25 +196,31 @@ class Incident extends Model
     }
 
     /**
-     * Applique un nouveau statut et journalise la transition.
+     * Applique un nouveau statut via le workflow centralisé.
+     *
+     * @throws InvalidIncidentTransitionException
      */
-    public function changeStatus(string $status, ?User $author = null, ?string $comment = null): void
-    {
-        $ancien = $this->status;
-
-        if ($ancien === $status) {
-            return;
+    public function changeStatus(
+        string $status,
+        ?User $author = null,
+        ?string $comment = null,
+        ?string $resolutionNote = null,
+        ?string $rejectionReason = null,
+    ): void {
+        if ($author === null) {
+            throw InvalidIncidentTransitionException::actorRequired();
         }
 
-        $this->status = $status;
-        $this->resolved_at = $status === 'traite' ? now() : null;
-        $this->save();
+        $updated = app(IncidentWorkflowService::class)->transition(
+            $this,
+            $status,
+            $author,
+            $comment,
+            $resolutionNote,
+            $rejectionReason,
+        );
 
-        $this->statusHistories()->create([
-            'user_id' => $author?->id,
-            'ancien_statut' => $ancien,
-            'nouveau_statut' => $status,
-            'comment' => $comment,
-        ]);
+        $this->setRawAttributes($updated->getAttributes(), true);
+        $this->setRelations([]);
     }
 }

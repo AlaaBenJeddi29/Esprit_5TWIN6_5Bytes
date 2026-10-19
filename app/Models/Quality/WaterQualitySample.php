@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Str;
 
 class WaterQualitySample extends Model
@@ -83,6 +84,14 @@ class WaterQualitySample extends Model
     public function alerts(): HasMany
     {
         return $this->hasMany(WaterQualityAlert::class, 'sample_id');
+    }
+
+    /**
+     * Contrôle planifié que ce prélèvement a permis d'effectuer.
+     */
+    public function planification(): HasOne
+    {
+        return $this->hasOne(QualityPlanification::class, 'water_quality_sample_id');
     }
 
     public function statutLabel(): string
