@@ -11,7 +11,7 @@ return [
     | as Mailgun, Postmark, AWS, and more. This file provides the conventional
     | location for service credentials.
     |
-    /
+    */
 
     'postmark' => [
         'key' => env('POSTMARK_API_KEY'),
@@ -34,11 +34,11 @@ return [
         ],
     ],
 
-    /
+    /*
     |--------------------------------------------------------------------------
     | Gemini AI
     |--------------------------------------------------------------------------
-    /
+    */
 
     'gemini' => [
         'api_key' => env('GEMINI_API_KEY'),
@@ -47,7 +47,7 @@ return [
         'ca_bundle' => env('GEMINI_CA_BUNDLE'),
     ],
 
-    /
+    /*
     |--------------------------------------------------------------------------
     | Ollama (Local AI — Gestion 1 Reports)
     |--------------------------------------------------------------------------
@@ -65,7 +65,26 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Local LLM layer (Ollama only — Gestion 5 and future modules)
+    | Confirmation IA des incidents similaires (Groq)
+    |--------------------------------------------------------------------------
+    |
+    | Fournisseur unique : Groq, compatible OpenAI (/chat/completions).
+    | La détection reste locale tant qu'aucune clé n'est configurée.
+    |
+    */
+
+    'groq' => [
+        'key' => env('GROQ_API_KEY'),
+        'url' => env('GROQ_API_URL', 'https://api.groq.com/openai/v1/chat/completions'),
+        'model' => env('GROQ_MODEL', 'openai/gpt-oss-120b'),
+        'timeout' => max(1, (int) env('GROQ_TIMEOUT', 30)),
+        'connect_timeout' => max(1, (int) env('GROQ_CONNECT_TIMEOUT', 5)),
+        'max_completion_tokens' => max(1, (int) env('GROQ_MAX_COMPLETION_TOKENS', 1500)),
+        'reasoning_effort' => env('GROQ_REASONING_EFFORT', 'low'),
+        'delay_ms' => max(0, (int) env('GROQ_DELAY_MS', 1000)),
+    ],
+   
+    /* Local LLM layer (Ollama only — Gestion 5 and future modules)
     |--------------------------------------------------------------------------
     |
     | Zero-cost, reusable layer consumed by App\Services\LocalLlmService.
@@ -105,3 +124,4 @@ return [
     ],
 
 ];
+

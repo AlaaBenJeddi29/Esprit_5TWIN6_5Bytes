@@ -2,6 +2,7 @@
 
 use App\Enums\UserRole;
 use App\Http\Controllers\Back\AlertSubscriptionController as BackAlertSubscriptionController;
+use App\Http\Controllers\Back\ComplaintController;
 use App\Http\Controllers\Back\AuditEventController;
 use App\Http\Controllers\Back\ConsumptionReadingController;
 use App\Http\Controllers\Back\ContractorController;
@@ -11,6 +12,7 @@ use App\Http\Controllers\Back\GestionnaireController;
 use App\Http\Controllers\Back\IncidentController as BackIncidentController;
 use App\Http\Controllers\Back\IncidentDashboardController;
 use App\Http\Controllers\Back\IncidentMapController;
+use App\Http\Controllers\Back\IncidentSimilarityController;
 use App\Http\Controllers\Back\InfrastructureController;
 use App\Http\Controllers\Back\MaintenanceController;
 use App\Http\Controllers\Back\ProjectController;
@@ -30,6 +32,7 @@ use App\Http\Controllers\Front\AlertSubscriptionController;
 use App\Http\Controllers\Front\CitizenDashboardController;
 use App\Http\Controllers\Front\HomeController;
 use App\Http\Controllers\Front\IncidentController as FrontIncidentController;
+use App\Http\Controllers\Front\IncidentFeedbackController as FrontIncidentFeedbackController;
 use App\Http\Controllers\Front\ProjectController as FrontProjectController;
 use App\Http\Controllers\Front\PublicDroughtController;
 use App\Http\Controllers\Front\PublicInfrastructureController;
@@ -106,8 +109,16 @@ Route::middleware(['auth', 'verified', 'role:citoyen'])
             ->name('incidents.comments.store');
         Route::post('/mes-incidents/{incident}/photos', [FrontIncidentController::class, 'storePhoto'])
             ->name('incidents.photos.store');
+        Route::get('/mes-incidents/{incident}/photos/{photo}', [FrontIncidentController::class, 'showPhoto'])
+            ->name('incidents.photos.show');
         Route::get('/mes-incidents/{incident}/photos/{photo}/telecharger', [FrontIncidentController::class, 'downloadPhoto'])
             ->name('incidents.photos.download');
+
+        // Évaluations et réclamations citoyennes
+        Route::get('/mes-evaluations', [FrontIncidentFeedbackController::class, 'index'])
+            ->name('feedbacks.index');
+        Route::post('/mes-incidents/{incident}/evaluation', [FrontIncidentFeedbackController::class, 'store'])
+            ->name('incidents.feedback.store');
 
         Route::get('/alertes', [AlertSubscriptionController::class, 'index'])->name('subscriptions.index');
         Route::post('/alertes', [AlertSubscriptionController::class, 'store'])->name('subscriptions.store');
@@ -161,8 +172,36 @@ Route::middleware(['auth', 'verified', 'role:gestionnaire,admin'])
             ->name('incidents.status');
         Route::post('incidents/{incident}/commentaires', [BackIncidentController::class, 'storeComment'])
             ->name('incidents.comments.store');
+
+        // Incidents similaires : détection à la demande et décision de gestionnaire
+        Route::post('incidents/{incident}/similarities/detect', [IncidentSimilarityController::class, 'detect'])
+            ->middleware('throttle:6,1')
+            ->name('incidents.similarities.detect');
+        Route::patch('incidents/{incident}/similarities/{similarity}', [IncidentSimilarityController::class, 'decide'])
+            ->middleware('throttle:30,1')
+            ->name('incidents.similarities.decide');
+
+        Route::get('incidents/{incident}/photos/{photo}', [BackIncidentController::class, 'showPhoto'])
+            ->name('incidents.photos.show');
         Route::get('incidents/{incident}/photos/{photo}/telecharger', [BackIncidentController::class, 'downloadPhoto'])
             ->name('incidents.photos.download');
+
+        // Réclamations et satisfaction citoyenne
+        // « stats » est déclarée AVANT {feedback} pour ne pas être capturée
+        // par la route de détail.
+        Route::get('complaints/stats', [ComplaintController::class, 'stats'])->name('complaints.stats');
+        Route::get('complaints', [ComplaintController::class, 'index'])->name('complaints.index');
+        Route::get('complaints/{feedback}', [ComplaintController::class, 'show'])->name('complaints.show');
+        Route::patch('complaints/{feedback}/review', [ComplaintController::class, 'review'])
+            ->name('complaints.review');
+        Route::post('complaints/{feedback}/response', [ComplaintController::class, 'respond'])
+            ->name('complaints.response');
+        Route::patch('complaints/{feedback}/decision', [ComplaintController::class, 'decide'])
+            ->name('complaints.decision');
+        Route::patch('complaints/{feedback}/close', [ComplaintController::class, 'close'])
+            ->name('complaints.close');
+        Route::patch('complaints/{feedback}/reopen', [ComplaintController::class, 'reopen'])
+            ->name('complaints.reopen');
 
         // Gestion 3 — Qualité de l'eau
         Route::resource('quality-thresholds', QualityThresholdController::class)

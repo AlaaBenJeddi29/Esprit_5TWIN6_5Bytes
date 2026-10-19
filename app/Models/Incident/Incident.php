@@ -7,6 +7,7 @@ use App\Models\Infrastructure\Infrastructure;
 use App\Models\Infrastructure\Zone;
 use App\Models\User;
 use App\Services\IncidentWorkflowService;
+use Database\Factories\Incident\IncidentFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -16,7 +17,7 @@ use Illuminate\Support\Str;
 
 class Incident extends Model
 {
-    /** @use HasFactory<\Database\Factories\Incident\IncidentFactory> */
+    /** @use HasFactory<IncidentFactory> */
     use HasFactory;
 
     public const TYPES = [
@@ -153,6 +154,27 @@ class Incident extends Model
         return $this->hasMany(IncidentStatusHistory::class)
             ->orderBy('created_at')
             ->orderBy('id');
+    }
+
+    public function feedbacks(): HasMany
+    {
+        return $this->hasMany(IncidentFeedback::class);
+    }
+
+    /**
+     * Suggestions d'incidents similaires émises pour cet incident.
+     */
+    public function similaritySuggestions(): HasMany
+    {
+        return $this->hasMany(IncidentSimilarity::class);
+    }
+
+    /**
+     * Suggestions dans lesquelles cet incident est le candidat similaire.
+     */
+    public function similarityMentions(): HasMany
+    {
+        return $this->hasMany(IncidentSimilarity::class, 'similar_incident_id');
     }
 
     public function scopeOpen(Builder $query): Builder

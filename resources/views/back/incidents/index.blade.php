@@ -53,6 +53,12 @@
             <option value="">Toutes les affectations</option>
             <option value="1" @selected($currentUnassigned)>Non affectés (hors doublons)</option>
         </select>
+        @if ($similaritiesAvailable)
+            <select name="similar" class="{{ $inputClass }}">
+                <option value="">Toutes les similarités</option>
+                <option value="1" @selected($currentSimilar)>Avec incidents similaires</option>
+            </select>
+        @endif
         @if ($currentOpen)
             <input type="hidden" name="open" value="1">
             <span class="inline-flex items-center gap-2 rounded-lg bg-brand-50 px-3 py-2 text-xs font-medium text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
@@ -89,6 +95,11 @@
                                         {{ $incident->typeLabel() }}
                                         @if ($incident->is_duplicate)
                                             <span class="ml-1 rounded-full bg-warning-50 px-2 py-0.5 text-[10px] font-medium text-warning-600 dark:bg-warning-500/15 dark:text-warning-400">Doublon possible</span>
+                                        @endif
+                                        @if ($similaritiesAvailable && $incident->pending_similarities_count > 0)
+                                            <span class="ml-1 rounded-full bg-brand-50 px-2 py-0.5 text-[10px] font-medium text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
+                                                {{ $incident->pending_similarities_count }} similaire{{ $incident->pending_similarities_count > 1 ? 's' : '' }}
+                                            </span>
                                         @endif
                                     </p>
                                 </td>

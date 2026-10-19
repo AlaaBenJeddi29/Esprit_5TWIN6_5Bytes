@@ -6,6 +6,8 @@ use App\Models\AlertSubscription;
 use App\Models\Drought\Restriction;
 use App\Models\Drought\ScheduledCut;
 use App\Models\Incident\Incident;
+use App\Models\Incident\IncidentFeedback;
+use App\Policies\IncidentFeedbackPolicy;
 use App\Models\Project\Funding;
 use App\Models\Project\Project;
 use App\Models\Project\ProjectDocument;
@@ -36,6 +38,7 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Gate::policy(Incident::class, IncidentPolicy::class);
+        Gate::policy(IncidentFeedback::class, IncidentFeedbackPolicy::class);
 
         // Piste d'audit Gestion 5 (insertion seule, acteur côté serveur).
         $audit = GestionAuditObserver::class;

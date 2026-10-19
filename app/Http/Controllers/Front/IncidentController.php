@@ -6,8 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Incident\StoreIncidentCommentRequest;
 use App\Http\Requests\Incident\StoreIncidentPhotoRequest;
 use App\Http\Requests\Incident\StoreIncidentRequest;
+use App\Jobs\DetectIncidentSimilarities;
 use App\Models\Incident\Incident;
-use App\Models\Incident\IncidentComment;
 use App\Models\Infrastructure\Infrastructure;
 use App\Models\Infrastructure\Zone;
 use App\Services\DuplicateDetector;
@@ -24,8 +24,7 @@ class IncidentController extends Controller
     public function __construct(
         private readonly IncidentClassifier $classifier,
         private readonly DuplicateDetector $duplicateDetector,
-    ) {
-    }
+    ) {}
 
     public function index(Request $request): View
     {
@@ -91,6 +90,8 @@ class IncidentController extends Controller
             ]);
         }
 
+        DetectIncidentSimilarities::dispatch($incident->id);
+
         return redirect()
             ->route('citizen.incidents.show', $incident)
             ->with('success', "Votre signalement {$incident->reference} a bien été enregistré.");
@@ -106,6 +107,9 @@ class IncidentController extends Controller
             'photos',
             'comments' => fn ($query) => $query->where('is_internal', false)->with('user')->latest(),
             'statusHistories.user',
+            'feedbacks' => fn ($query) => $query
+                ->where('user_id', $request->user()->id)
+                ->with(['histories.user']),
         ]);
 
         return view('front.incidents.show', compact('incident'));
@@ -167,6 +171,21 @@ class IncidentController extends Controller
         ]);
 
         return back()->with('success', 'La photo a été ajoutée au signalement.');
+    }
+
+    public function showPhoto(Request $request, Incident $incident, int $photoId): StreamedResponse
+    {
+        Gate::authorize('view', $incident);
+
+        $photo = $incident->photos()->findOrFail($photoId);
+        $disk = Storage::disk('local');
+
+        abort_unless($disk->exists($photo->chemin_fichier), 404);
+
+        return $disk->response($photo->chemin_fichier, $photo->nom_original ?? basename($photo->chemin_fichier), [
+            'Content-Type' => $photo->mime_type ?: $disk->mimeType($photo->chemin_fichier),
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
     }
 
     public function downloadPhoto(Request $request, Incident $incident, int $photoId): StreamedResponse

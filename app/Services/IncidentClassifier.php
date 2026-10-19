@@ -68,8 +68,8 @@ class IncidentClassifier
         };
 
         $confidence = $bestScore > 0
-            ? min(0.95, 0.6 + ($bestScore * 0.1))
-            : 0.45;
+            ? min(95, 60 + ($bestScore * 10))
+            : 45;
 
         $summary = sprintf(
             'Classification heuristique : « %s », gravité %s, priorité %s. %s',
