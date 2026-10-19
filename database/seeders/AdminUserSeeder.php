@@ -19,8 +19,8 @@ use Illuminate\Support\Facades\Hash;
  * - idempotent : si un utilisateur avec cet email existe déjà, rien n'est créé
  *   ni écrasé.
  *
- * Ce seeder n'est PAS appelé automatiquement par DatabaseSeeder ; il doit être
- * déclenché explicitement (php artisan db:seed --class=AdminUserSeeder).
+ * Ce seeder est appelé par DatabaseSeeder ; il peut aussi être déclenché seul
+ * (php artisan db:seed --class=AdminUserSeeder).
  */
 class AdminUserSeeder extends Seeder
 {

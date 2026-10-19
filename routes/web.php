@@ -3,6 +3,7 @@
 use App\Enums\UserRole;
 use App\Http\Controllers\Back\AlertSubscriptionController as BackAlertSubscriptionController;
 use App\Http\Controllers\Back\ComplaintController;
+use App\Http\Controllers\Back\AuditEventController;
 use App\Http\Controllers\Back\ConsumptionReadingController;
 use App\Http\Controllers\Back\ContractorController;
 use App\Http\Controllers\Back\DashboardController;
@@ -18,7 +19,9 @@ use App\Http\Controllers\Back\ProjectController;
 use App\Http\Controllers\Back\ProjectDocumentController;
 use App\Http\Controllers\Back\ProjectPhaseController;
 use App\Http\Controllers\Back\QualityAlertController;
+use App\Http\Controllers\Back\QualityPlanificationController;
 use App\Http\Controllers\Back\QualityThresholdController;
+use App\Http\Controllers\Back\QualityZoneAssignmentController;
 use App\Http\Controllers\Back\ReportController;
 use App\Http\Controllers\Back\RestrictionController;
 use App\Http\Controllers\Back\ScheduledCutController;
@@ -35,6 +38,7 @@ use App\Http\Controllers\Front\PublicDroughtController;
 use App\Http\Controllers\Front\PublicInfrastructureController;
 use App\Http\Controllers\Front\PublicQualityController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\StripeWebhookController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -63,11 +67,16 @@ Route::get('/projets/{project}', [FrontProjectController::class, 'show'])->name(
 Route::get('/projets/{project}/documents/{document}/telecharger', [FrontProjectController::class, 'downloadDocument'])
     ->name('public.projects.documents.download');
 Route::post('/projets/{project}/assistant', [FrontProjectController::class, 'assistant'])
+    ->middleware('throttle:15,1')
     ->name('public.projects.assistant');
 
 // Suivi public d'un incident par référence
 Route::get('/suivi', [FrontIncidentController::class, 'trackForm'])->name('front.incidents.track.form');
 Route::post('/suivi', [FrontIncidentController::class, 'track'])->name('front.incidents.track');
+
+// Webhook Stripe Checkout : hors authentification, vérifié par signature
+// (CSRF exempté pour cette route uniquement — voir bootstrap/app.php).
+Route::post('/stripe/webhook', StripeWebhookController::class)->name('stripe.webhook');
 
 /*
 |--------------------------------------------------------------------------
@@ -117,6 +126,10 @@ Route::middleware(['auth', 'verified', 'role:citoyen'])
             ->name('subscriptions.destroy');
 
         Route::post('/projets/{project}/don', [FrontProjectController::class, 'donate'])->name('projects.donate');
+        Route::get('/projets/{project}/don/succes', [FrontProjectController::class, 'donationSuccess'])
+            ->name('projects.donation.success');
+        Route::get('/projets/{project}/don/annule', [FrontProjectController::class, 'donationCancel'])
+            ->name('projects.donation.cancel');
     });
 
 /*
@@ -203,24 +216,49 @@ Route::middleware(['auth', 'verified', 'role:gestionnaire,admin'])
             ->only(['index', 'update', 'destroy'])
             ->parameters(['quality-alerts' => 'alert']);
 
+        // Planification des prélèvements — route calendrier déclarée AVANT la
+        // ressource pour ne pas être capturée par {planification}.
+        Route::get('quality-planifications/calendrier', [QualityPlanificationController::class, 'calendar'])
+            ->name('quality-planifications.calendar');
+        Route::resource('quality-planifications', QualityPlanificationController::class)
+            ->names('quality-planifications')
+            ->except(['show'])
+            ->parameters(['quality-planifications' => 'planification']);
+        Route::get('quality-zone-assignments', [QualityZoneAssignmentController::class, 'index'])
+            ->name('quality-assignments.index');
+        Route::put('quality-zone-assignments', [QualityZoneAssignmentController::class, 'update'])
+            ->name('quality-assignments.update');
+
         // Gestion 4 — Sécheresse, consommation et continuité de service
+        Route::get('water-levels/export/{format}', [WaterLevelController::class, 'export'])
+            ->name('water-levels.export');
         Route::resource('water-levels', WaterLevelController::class)
             ->names('water-levels')
             ->except(['show'])
             ->parameters(['water-levels' => 'level']);
+        
+        Route::get('consumption-readings/export/{format}', [ConsumptionReadingController::class, 'export'])
+            ->name('consumption-readings.export');
         Route::get('consumption-readings/previsions', [ConsumptionReadingController::class, 'forecast'])
             ->name('consumption-readings.forecast');
         Route::resource('consumption-readings', ConsumptionReadingController::class)
             ->names('consumption-readings')
             ->except(['show'])
             ->parameters(['consumption-readings' => 'reading']);
+        
+        Route::get('restrictions/export/{format}', [RestrictionController::class, 'export'])
+            ->name('restrictions.export');
         Route::resource('restrictions', RestrictionController::class)
             ->names('restrictions')
             ->except(['show']);
+        
+        Route::get('scheduled-cuts/export/{format}', [ScheduledCutController::class, 'export'])
+            ->name('scheduled-cuts.export');
         Route::resource('scheduled-cuts', ScheduledCutController::class)
             ->names('scheduled-cuts')
             ->except(['show'])
             ->parameters(['scheduled-cuts' => 'cut']);
+        
         Route::get('alert-subscriptions', [BackAlertSubscriptionController::class, 'index'])
             ->name('alert-subscriptions.index');
 
@@ -232,6 +270,9 @@ Route::middleware(['auth', 'verified', 'role:gestionnaire,admin'])
         Route::resource('projects', ProjectController::class)->names('projects');
 
         Route::prefix('projects/{project}')->name('projects.')->group(function () {
+            // Rapport IA du projet (lecture seule — PDF Dompdf, Gestion 5).
+            Route::get('rapport', [ProjectController::class, 'rapport'])->name('rapport');
+
             Route::resource('phases', ProjectPhaseController::class)
                 ->names('phases')
                 ->except(['index', 'show'])
@@ -247,6 +288,9 @@ Route::middleware(['auth', 'verified', 'role:gestionnaire,admin'])
                 ->except(['index', 'show'])
                 ->parameters(['documents' => 'document']);
         });
+
+        // Journal d'audit Gestion 5 (lecture seule — insertion seule par construction).
+        Route::get('audit-events', [AuditEventController::class, 'index'])->name('audit-events.index');
 
         // Gestion des gestionnaires : réservée aux administrateurs (Lot 1b)
         Route::middleware('role:admin')->group(function () {

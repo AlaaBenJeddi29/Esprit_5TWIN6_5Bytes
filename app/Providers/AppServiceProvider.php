@@ -2,9 +2,22 @@
 
 namespace App\Providers;
 
+use App\Models\AlertSubscription;
+use App\Models\Drought\Restriction;
+use App\Models\Drought\ScheduledCut;
 use App\Models\Incident\Incident;
 use App\Models\Incident\IncidentFeedback;
 use App\Policies\IncidentFeedbackPolicy;
+use App\Models\Project\Funding;
+use App\Models\Project\Project;
+use App\Models\Project\ProjectDocument;
+use App\Models\Project\ProjectPhase;
+use App\Observers\GestionAuditObserver;
+use App\Models\Quality\WaterQualityAlert;
+use App\Observers\AlertSubscriptionObserver;
+use App\Observers\RestrictionObserver;
+use App\Observers\ScheduledCutObserver;
+use App\Observers\WaterQualityAlertObserver;
 use App\Policies\IncidentPolicy;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
@@ -26,5 +39,17 @@ class AppServiceProvider extends ServiceProvider
     {
         Gate::policy(Incident::class, IncidentPolicy::class);
         Gate::policy(IncidentFeedback::class, IncidentFeedbackPolicy::class);
+
+        // Piste d'audit Gestion 5 (insertion seule, acteur côté serveur).
+        $audit = GestionAuditObserver::class;
+        Project::observe($audit);
+        ProjectPhase::observe($audit);
+        Funding::observe($audit);
+        ProjectDocument::observe($audit);
+        // Register observers for alert notifications
+        AlertSubscription::observe(AlertSubscriptionObserver::class);
+        WaterQualityAlert::observe(WaterQualityAlertObserver::class);
+        Restriction::observe(RestrictionObserver::class);
+        ScheduledCut::observe(ScheduledCutObserver::class);
     }
 }

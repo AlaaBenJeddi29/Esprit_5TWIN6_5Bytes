@@ -2,11 +2,21 @@
 
 @section('title', 'AquaSecure — Projet '.$project->titre)
 
+@php use App\Services\ProjectDeadlineIndicators; @endphp
+
 @section('content')
 
     <x-back.page-header :title="$project->titre"
         :desc="ucfirst($project->type).' — '.ucfirst(str_replace('_', ' ', $project->statut)).($project->zone ? ' · '.$project->zone->nom : '')">
         <x-slot:action>
+            <a href="{{ route('back.projects.rapport', $project) }}" target="_blank"
+               class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-theme-xs transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03] dark:hover:text-gray-300">
+                Rapport PDF
+            </a>
+            <a href="{{ route('back.audit-events.index', ['project_id' => $project->id]) }}"
+               class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-theme-xs transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03] dark:hover:text-gray-300">
+                Historique
+            </a>
             <a href="{{ route('back.projects.edit', $project) }}"
                class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-theme-xs transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03] dark:hover:text-gray-300">
                 Modifier
@@ -17,11 +27,51 @@
     </x-back.page-header>
 
     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <x-back.stat-card label="Budget prévu" :value="number_format((float) $project->budget_prevu, 2, ',', ' ').' €'" />
-        <x-back.stat-card label="Coût des phases" :value="number_format($budgetTotal, 2, ',', ' ').' €'" />
-        <x-back.stat-card label="Financements reçus" :value="number_format($fundingTotal, 2, ',', ' ').' €'" />
+        <x-back.stat-card label="Budget prévu" :value="number_format($metrics->budgetPrevu, 2, ',', ' ').' €'" />
+        <x-back.stat-card label="Coût des phases" :value="number_format($metrics->phasesCostTotal, 2, ',', ' ').' €'" hint="Estimation de travaux" />
+        <x-back.stat-card label="Financements reçus" :value="number_format($metrics->fundingTotal, 2, ',', ' ').' €'" />
         <x-back.stat-card label="Avancement" :value="$project->avancement_pourcentage.' %'" />
     </div>
+
+    <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <x-back.stat-card label="Taux de financement" :value="$metrics->fundingRate.' %'" hint="du budget prévu" />
+        <x-back.stat-card label="Reste à financer" :value="number_format($metrics->fundingGap, 2, ',', ' ').' €'" />
+        <x-back.stat-card label="Phases en retard" :value="(string) $metrics->overduePhaseCount" :hint="'sur '.$metrics->phaseCount.' phase(s)'" />
+        <x-back.stat-card label="Échéance" :value="match ($metrics->deadlineStatus) {
+            ProjectDeadlineIndicators::ECHEANCE_DEPASSEE => 'Dépassée',
+            ProjectDeadlineIndicators::ECHEANCE_PROCHE => 'Proche',
+            ProjectDeadlineIndicators::ECHEANCE_AUCUNE => '—',
+            default => 'Dans les délais',
+        }" :hint="ProjectDeadlineIndicators::projectExplanation($project)" />
+    </div>
+
+    @if ($metrics->deadlineStatus === ProjectDeadlineIndicators::ECHEANCE_DEPASSEE || $metrics->deadlineStatus === ProjectDeadlineIndicators::ECHEANCE_PROCHE)
+        <div @class([
+            'mt-4 flex items-start gap-3 rounded-2xl border p-4 text-sm',
+            'border-red-200 bg-red-50 text-red-800 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200' => $metrics->deadlineStatus === ProjectDeadlineIndicators::ECHEANCE_DEPASSEE,
+            'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200' => $metrics->deadlineStatus === ProjectDeadlineIndicators::ECHEANCE_PROCHE,
+        ])>
+            <svg class="mt-0.5 h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+            </svg>
+            <p>{{ ProjectDeadlineIndicators::projectExplanation($project) }}</p>
+        </div>
+    @endif
+
+    @if ($metrics->overFunded)
+        <div class="mt-4 flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+            <svg class="mt-0.5 h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+            </svg>
+            <p>
+                Sur-financement détecté : les financements enregistrés dépassent le budget prévu
+                de {{ number_format($metrics->overFunding, 2, ',', ' ') }} €
+                ({{ number_format($metrics->fundingTotal, 2, ',', ' ') }} € reçus pour
+                {{ number_format($metrics->budgetPrevu, 2, ',', ' ') }} € planifiés).
+                Aucune donnée n'a été rejetée — cette alerte est purement informative.
+            </p>
+        </div>
+    @endif
 
     <div class="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6 lg:col-span-2">
@@ -83,7 +133,17 @@
                             <tr class="border-b border-gray-100 transition-colors last:border-0 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/[0.02]">
                                 <td class="px-5 py-3 text-sm font-medium text-gray-800 dark:text-white/90">{{ $phase->nom }}</td>
                                 <td class="px-5 py-3 text-sm text-gray-500 dark:text-gray-400">{{ $phase->contractor?->nom ?? '—' }}</td>
-                                <td class="px-5 py-3 text-sm text-gray-500 dark:text-gray-400">{{ $phase->date_debut?->format('d/m/Y') }} → {{ $phase->date_fin?->format('d/m/Y') }}</td>
+                                <td class="px-5 py-3 text-sm text-gray-500 dark:text-gray-400">
+                                    {{ $phase->date_debut?->format('d/m/Y') }} → {{ $phase->date_fin?->format('d/m/Y') }}
+                                    @php($echeancePhase = ProjectDeadlineIndicators::phaseStatus($phase))
+                                    @if (! ProjectDeadlineIndicators::projectIsClosed($project) && $echeancePhase === ProjectDeadlineIndicators::ECHEANCE_DEPASSEE)
+                                        <span class="ml-1 inline-block rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-600 dark:bg-red-500/10 dark:text-red-300"
+                                              title="{{ ProjectDeadlineIndicators::phaseExplanation($phase) }}">En retard</span>
+                                    @elseif (! ProjectDeadlineIndicators::projectIsClosed($project) && $echeancePhase === ProjectDeadlineIndicators::ECHEANCE_PROCHE)
+                                        <span class="ml-1 inline-block rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-600 dark:bg-amber-500/10 dark:text-amber-300"
+                                              title="{{ ProjectDeadlineIndicators::phaseExplanation($phase) }}">Échéance proche</span>
+                                    @endif
+                                </td>
                                 <td class="px-5 py-3 text-sm text-gray-500 dark:text-gray-400">{{ number_format((float) $phase->cout, 2, ',', ' ') }} €</td>
                                 <td class="px-5 py-3 text-sm text-gray-500 dark:text-gray-400">{{ $phase->avancement }} %</td>
                                 <td class="px-5 py-3">

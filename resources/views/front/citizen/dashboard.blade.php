@@ -128,19 +128,21 @@
 
             {{-- Dons --}}
             <div class="mt-6 rounded-md bg-white p-6 shadow-1 dark:bg-dark-2">
-                <h2 class="mb-4 text-lg font-bold text-dark dark:text-white">Mes dons simulés</h2>
+                <h2 class="mb-4 text-lg font-bold text-dark dark:text-white">Mes dons</h2>
 
                 @forelse ($donations as $donation)
                     <div class="flex items-center justify-between border-b border-stroke py-3 last:border-0 dark:border-dark-3">
                         <div>
                             <p class="text-sm font-medium text-dark dark:text-white">{{ $donation->project?->nom ?? 'Projet supprimé' }}</p>
-                            <p class="mt-1 text-xs text-body-color dark:text-dark-6">{{ $donation->date_versement?->format('d/m/Y') ?? '—' }}</p>
+                            <p class="mt-1 text-xs text-body-color dark:text-dark-6">
+                                {{ $donation->date_versement?->format('d/m/Y') ?? '—' }} · {{ $donation->statutPaiementLabel() }}
+                            </p>
                         </div>
                         <span class="text-sm font-semibold text-primary">{{ number_format((float) $donation->montant, 2, ',', ' ') }} €</span>
                     </div>
                 @empty
                     <p class="text-sm text-body-color dark:text-dark-6">
-                        Aucun don pour le moment. Les dons sont simulés : aucun paiement réel n'est effectué.
+                        Aucun don pour le moment.
                         <a href="{{ route('public.projects.index') }}" class="font-medium text-primary hover:underline">Découvrir les projets</a>.
                     </p>
                 @endforelse

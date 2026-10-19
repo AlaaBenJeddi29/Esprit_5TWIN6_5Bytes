@@ -1,0 +1,37 @@
+{
+  "id": "FEAT-004",
+  "type": "feat",
+  "description": "Interactive frontend & risk integration: Upgrade forecast.blade.php with Chart.js dual-line graph (historical + forecast + confidence band), responsive dark mode styling, integrate forecast data into DroughtAnalyzer::riskScore(), and update package.json with Chart.js dependency.",
+  "status": "pending",
+  "steps": [
+    "Update package.json: Add 'chart.js' to dependencies (e.g., '^4.4.0'). Run npm install.",
+    "Update resources/views/back/drought/consumption/forecast.blade.php. Modify each forecast card to replace static bar chart with interactive Chart.js canvas. (1) For each zone, prepare data structure: historical_months (array), historical_values (array), forecast_months (array), forecast_values (array), lower_bounds (array), upper_bounds (array). (2) Initialize Chart.js with configuration: type='line', dual datasets (historical solid line, forecast dashed line), fill between upper/lower for confidence band, responsive, dark mode colors (use CSS variable or inline colors based on $theme). (3) Include in Blade via inline <script> or Alpine x-data binding. (4) Add tooltip formatter to display month, value in French. (5) Add legend with labels: 'Historique', 'Prévision', 'Intervalle de confiance'.",
+    "Modify app/Http/Controllers/Back/ConsumptionReadingController::forecast() to fetch ConsumptionForecast records for each zone and pass to view as $forecasts[$i]['consumption_forecasts'] array.",
+    "Modify app/Services/DroughtAnalyzer::riskScore(Zone $zone) to integrate forecast: (1) Fetch latest ConsumptionForecast for the zone. (2) If forecast exists: if prediction shows >15% decline vs. baseline over 6 months, add 10 points to risk. If lower_bound < critical threshold (e.g., 5% of typical), add 15 points. (3) Include in $facteurs array: 'Prévision d'une consommation en hausse / baisse significative.'",
+    "Verify styling: navigate to /back/consumption-readings/previsions in light mode and dark mode; confirm Chart.js renders, confidence band visible, colors correct.",
+    "Run npm run build to compile assets."
+  ],
+  "acceptance_criteria": [
+    "package.json contains 'chart.js' dependency.",
+    "npm install completes successfully with Chart.js in node_modules.",
+    "forecast.blade.php displays interactive Chart.js graph for each zone.",
+    "Graph shows historical data (solid line), forecast (dashed line), confidence band (shaded area).",
+    "Graph is responsive and works on mobile view.",
+    "Dark mode classes (dark:text-white, dark:bg-gray-800) applied correctly.",
+    "Month labels in French (janvier, février, etc.).",
+    "riskScore() includes forecast data in calculation (reflected in score + $facteurs).",
+    "No console errors in browser dev tools."
+  ],
+  "verification": [
+    "npm run build (compiles without errors)",
+    "Navigate to http://localhost:8000/back/consumption-readings/previsions in browser (loads page)",
+    "Inspect page source or browser inspector: <canvas> elements present with Chart.js initialization",
+    "Browser console: no JavaScript errors",
+    "Toggle dark mode (if theme toggle available): colors adapt",
+    "Mouse over chart line/points: tooltip shows French month + value",
+    "Resize browser window: graph responsive",
+    "Call php artisan tinker: $zone = Zone::find(1); $drought = app('App\\Services\\DroughtAnalyzer'); $risk = $drought->riskScore($zone); dd($risk); (confirm $facteurs includes forecast-based messages if forecast exists)"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

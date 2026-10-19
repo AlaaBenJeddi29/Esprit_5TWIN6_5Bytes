@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Drought\ConsumptionForecast;
 use App\Models\Drought\ConsumptionReading;
 use App\Models\Drought\Restriction;
 use App\Models\Drought\WaterLevel;
@@ -12,6 +13,30 @@ use Illuminate\Support\Carbon;
 
 class DroughtAnalyzer
 {
+    /**
+     * Forecast surge threshold (percentage increase).
+     * Domain assumption: >15% increase in predicted consumption indicates urgent demand pressure.
+     * Adjust based on water authority risk policy.
+     * @var float
+     */
+    private const FORECAST_SURGE_THRESHOLD = 0.15;
+
+    /**
+     * Forecast shortage threshold (percentage decrease).
+     * Domain assumption: >15% decrease indicates potential supply shortage risk.
+     * Adjust based on water authority risk policy.
+     * @var float
+     */
+    private const FORECAST_SHORTAGE_THRESHOLD = -0.15;
+
+    /**
+     * Critical consumption threshold (m³).
+     * Domain assumption: consumption levels below 10,000 m³ are considered critical for the zone.
+     * Adjust based on zone capacity and operational limits.
+     * @var int
+     */
+    private const CRITICAL_CONSUMPTION_THRESHOLD = 10000;
+
     /**
      * Prévision de consommation par régression linéaire simple sur les
      * derniers relevés mensuels. Heuristique locale, sans service externe.
@@ -118,6 +143,38 @@ class DroughtAnalyzer
         } elseif ($variation > 3) {
             $score += 10;
             $facteurs[] = 'Consommation légèrement orientée à la hausse.';
+        }
+
+        // Check consumption forecasts from DB for declining trends
+        $consumptionForecasts = \App\Models\Drought\ConsumptionForecast::query()
+            ->where('zone_id', $zone->id)
+            ->where('forecast_month', '>=', Carbon::now()->startOfMonth())
+            ->orderBy('forecast_month')
+            ->limit(6)
+            ->get();
+
+        if ($consumptionForecasts->isNotEmpty()) {
+            $firstForecast = $consumptionForecasts->first()?->prediction_m3;
+            $lastForecast = $consumptionForecasts->last()?->prediction_m3;
+
+            if ($firstForecast && $lastForecast) {
+                $forecastVariation = (($lastForecast - $firstForecast) / $firstForecast) * 100;
+
+                if ($forecastVariation > (self::FORECAST_SURGE_THRESHOLD * 100)) {
+                    $score += 10;
+                    $facteurs[] = 'Prévisions montrent une hausse de consommation importante (>15%).';
+                } elseif ($forecastVariation < (self::FORECAST_SHORTAGE_THRESHOLD * 100)) {
+                    $score += 15;
+                    $facteurs[] = 'Prévisions montrent un risque de pénurie (baisse > 15%).';
+                }
+            }
+
+            // Check if lower bounds approach critical thresholds
+            $criticalCount = $consumptionForecasts->where('lower_bound', '<', self::CRITICAL_CONSUMPTION_THRESHOLD)->count();
+            if ($criticalCount > 0) {
+                $score += 15;
+                $facteurs[] = "Intervalle de confiance inférieur approche des niveaux critiques pour {$criticalCount} mois.";
+            }
         }
 
         $activeRestrictions = Restriction::query()

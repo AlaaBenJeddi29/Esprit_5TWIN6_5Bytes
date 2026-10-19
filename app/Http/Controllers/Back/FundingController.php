@@ -10,6 +10,7 @@ use App\Models\Project\Funding;
 use App\Models\Project\Project;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class FundingController extends Controller
@@ -18,7 +19,7 @@ class FundingController extends Controller
     {
         return view('back.projects.fundings.create', [
             'project' => $project,
-            'funding' => new Funding(),
+            'funding' => new Funding,
             'sources' => Funding::SOURCES,
             'donateurs' => $this->donateurs(),
         ]);
@@ -26,7 +27,7 @@ class FundingController extends Controller
 
     public function store(StoreFundingRequest $request, Project $project): RedirectResponse
     {
-        $funding = $project->fundings()->create($request->validated());
+        DB::transaction(fn () => $project->fundings()->create($request->validated()));
 
         return redirect()
             ->route('back.projects.show', $project)
@@ -49,7 +50,7 @@ class FundingController extends Controller
     {
         $this->ensureBelongsToProject($project, $funding);
 
-        $funding->update($request->validated());
+        DB::transaction(fn () => $funding->update($request->validated()));
 
         return redirect()
             ->route('back.projects.show', $project)
@@ -60,7 +61,7 @@ class FundingController extends Controller
     {
         $this->ensureBelongsToProject($project, $funding);
 
-        $funding->delete();
+        DB::transaction(fn () => $funding->delete());
 
         return redirect()
             ->route('back.projects.show', $project)

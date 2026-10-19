@@ -65,13 +65,17 @@ class CitizenDashboardController extends Controller
 
         $donations = Funding::query()
             ->where('donateur_id', $user->id)
+            ->where('source', 'don')
             ->with('project')
             ->latest('date_versement')
             ->limit(10)
             ->get();
 
+        // Seuls les dons confirmés comptent dans le total personnel.
         $donationsTotal = (float) Funding::query()
             ->where('donateur_id', $user->id)
+            ->where('source', 'don')
+            ->confirmees()
             ->sum('montant');
 
         $notifications = $user->notifications()->latest()->limit(5)->get();

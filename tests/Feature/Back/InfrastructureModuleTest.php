@@ -92,15 +92,19 @@ class InfrastructureModuleTest extends TestCase
         $this->assertDatabaseMissing('zones', ['id' => $zone->id]);
     }
 
-    public function test_deleting_zone_cascades_to_infrastructures(): void
+    public function test_deleting_zone_with_infrastructures_is_refused(): void
     {
         $gestionnaire = $this->gestionnaire();
         $zone = Zone::factory()->create();
         $infrastructure = Infrastructure::factory()->create(['zone_id' => $zone->id]);
 
-        $this->actingAs($gestionnaire)->delete(route('back.zones.destroy', $zone));
+        $this->actingAs($gestionnaire)
+            ->delete(route('back.zones.destroy', $zone))
+            ->assertRedirect(route('back.zones.index'))
+            ->assertSessionHas('error');
 
-        $this->assertDatabaseMissing('infrastructures', ['id' => $infrastructure->id]);
+        $this->assertDatabaseHas('zones', ['id' => $zone->id]);
+        $this->assertDatabaseHas('infrastructures', ['id' => $infrastructure->id]);
     }
 
     public function test_gestionnaire_can_create_infrastructure(): void
