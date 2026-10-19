@@ -189,6 +189,8 @@ class IncidentModuleTest extends TestCase
         $this->assertSame('critique', $incident->severity);
         $this->assertSame('urgente', $incident->priority);
         $this->assertNotNull($incident->ai_confidence);
+        $this->assertGreaterThan(1, (float) $incident->ai_confidence);
+        $this->assertLessThanOrEqual(95, (float) $incident->ai_confidence);
         $this->assertDatabaseHas('incident_status_histories', [
             'incident_id' => $incident->id,
             'nouveau_statut' => 'nouveau',

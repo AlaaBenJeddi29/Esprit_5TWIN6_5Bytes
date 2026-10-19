@@ -161,6 +161,22 @@ class Incident extends Model
         return $this->hasMany(IncidentFeedback::class);
     }
 
+    /**
+     * Suggestions d'incidents similaires émises pour cet incident.
+     */
+    public function similaritySuggestions(): HasMany
+    {
+        return $this->hasMany(IncidentSimilarity::class);
+    }
+
+    /**
+     * Suggestions dans lesquelles cet incident est le candidat similaire.
+     */
+    public function similarityMentions(): HasMany
+    {
+        return $this->hasMany(IncidentSimilarity::class, 'similar_incident_id');
+    }
+
     public function scopeOpen(Builder $query): Builder
     {
         return $query->whereNotIn('status', ['traite', 'rejete']);

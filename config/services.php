@@ -65,21 +65,23 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Confirmation IA des incidents similaires
+    | Confirmation IA des incidents similaires (Groq)
     |--------------------------------------------------------------------------
     |
-    | Fournisseur compatible OpenAI (/chat/completions). Désactivé par défaut :
-    | la détection reste entièrement locale tant que XAI_API_KEY est absente.
-    | L'URL et le modèle sont configurables pour rester indépendant du
-    | fournisseur (xAI, Groq, etc.).
+    | Fournisseur unique : Groq, compatible OpenAI (/chat/completions).
+    | La détection reste locale tant qu'aucune clé n'est configurée.
     |
     */
 
-    'xai' => [
-        'api_key' => env('XAI_API_KEY'),
-        'url' => env('XAI_API_URL', 'https://api.x.ai/v1/chat/completions'),
-        'model' => env('XAI_MODEL', 'grok-4.7'),
-        'timeout' => (int) env('XAI_TIMEOUT', 15),
+    'groq' => [
+        'key' => env('GROQ_API_KEY'),
+        'url' => env('GROQ_API_URL', 'https://api.groq.com/openai/v1/chat/completions'),
+        'model' => env('GROQ_MODEL', 'openai/gpt-oss-120b'),
+        'timeout' => max(1, (int) env('GROQ_TIMEOUT', 30)),
+        'connect_timeout' => max(1, (int) env('GROQ_CONNECT_TIMEOUT', 5)),
+        'max_completion_tokens' => max(1, (int) env('GROQ_MAX_COMPLETION_TOKENS', 1500)),
+        'reasoning_effort' => env('GROQ_REASONING_EFFORT', 'low'),
+        'delay_ms' => max(0, (int) env('GROQ_DELAY_MS', 1000)),
     ],
 
 ];

@@ -33,5 +33,11 @@
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
+        <!-- Aucun appel IA réel pendant les tests : l'IA est désactivée et la clé est factice. -->
+        <env name="INCIDENT_SIMILARITY_AI_ENABLED" value="false" force="true"/>
+        <env name="GROQ_API_KEY" value="test" force="true"/>
+        <env name="GROQ_API_URL" value="https://api.groq.com/openai/v1/chat/completions" force="true"/>
+        <env name="GROQ_MODEL" value="openai/gpt-oss-120b" force="true"/>
+        <env name="GROQ_TIMEOUT" value="30" force="true"/>
     </php>
 </phpunit>

@@ -59,16 +59,41 @@
         @error('address')<p class="mt-1 text-xs text-error-600">{{ $message }}</p>@enderror
     </div>
 
+    <div class="md:col-span-2">
+        <label for="incident-map-search" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Localiser sur la carte</label>
+        <div class="relative">
+            <div class="flex flex-col gap-2 sm:flex-row">
+                <input type="text" id="incident-map-search" data-zone-map-search autocomplete="off"
+                       placeholder="Adresse, commune, lieu…"
+                       class="{{ $inputClass }} min-w-0 flex-1">
+                <button type="button" data-zone-map-search-button
+                        class="mt-1 inline-flex shrink-0 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-theme-xs transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700">
+                    Rechercher
+                </button>
+            </div>
+            <ul data-zone-map-results role="listbox"
+                class="absolute z-20 mt-1 hidden max-h-60 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900"></ul>
+        </div>
+        <p data-zone-map-status class="mt-2 text-xs text-gray-500 dark:text-gray-400" aria-live="polite">
+            Cliquez sur la carte, déplacez le marqueur ou recherchez une adresse pour renseigner automatiquement la latitude et la longitude.
+        </p>
+        <div id="incident-location-map" data-zone-map data-lat-input="latitude" data-lng-input="longitude"
+             class="mt-3 h-72 w-full rounded-lg border border-gray-200 dark:border-gray-700"
+             aria-label="Carte de localisation de l'incident"></div>
+    </div>
+
     <div>
         <label for="latitude" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Latitude</label>
-        <input type="text" id="latitude" name="latitude" value="{{ old('latitude', $incident->latitude) }}" class="{{ $inputClass }}">
+        <input type="text" id="latitude" name="latitude" value="{{ old('latitude', $incident->latitude) }}" autocomplete="off" class="{{ $inputClass }}">
         @error('latitude')<p class="mt-1 text-xs text-error-600">{{ $message }}</p>@enderror
+        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Renseignée par la carte ou saisie manuellement.</p>
     </div>
 
     <div>
         <label for="longitude" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Longitude</label>
-        <input type="text" id="longitude" name="longitude" value="{{ old('longitude', $incident->longitude) }}" class="{{ $inputClass }}">
+        <input type="text" id="longitude" name="longitude" value="{{ old('longitude', $incident->longitude) }}" autocomplete="off" class="{{ $inputClass }}">
         @error('longitude')<p class="mt-1 text-xs text-error-600">{{ $message }}</p>@enderror
+        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Renseignée par la carte ou saisie manuellement.</p>
     </div>
 
     <div>

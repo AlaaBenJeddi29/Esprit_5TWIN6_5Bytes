@@ -8,13 +8,17 @@ use App\Http\Requests\Incident\StoreBackIncidentRequest;
 use App\Http\Requests\Incident\StoreIncidentCommentRequest;
 use App\Http\Requests\Incident\UpdateBackIncidentRequest;
 use App\Http\Requests\Incident\UpdateIncidentStatusRequest;
+use App\Jobs\DetectIncidentSimilarities;
 use App\Models\Incident\Incident;
+use App\Models\Incident\IncidentSimilarity;
 use App\Models\Infrastructure\Infrastructure;
 use App\Models\Infrastructure\Zone;
 use App\Models\User;
+use App\Services\IncidentSimilarityService;
 use App\Services\IncidentWorkflowService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -23,6 +27,7 @@ class IncidentController extends Controller
 {
     public function __construct(
         private readonly IncidentWorkflowService $workflow,
+        private readonly IncidentSimilarityService $similarityService,
     ) {}
 
     public function index(Request $request): View
@@ -34,9 +39,15 @@ class IncidentController extends Controller
         $zoneId = $request->integer('zone_id');
         $unassigned = $request->boolean('unassigned');
         $open = $request->boolean('open');
+        $similar = $request->boolean('similar');
+        $similaritiesAvailable = Schema::hasTable('incident_similarities');
 
         $incidents = Incident::query()
             ->with(['user', 'zone', 'assignee'])
+            ->when($similaritiesAvailable, fn ($query) => $query->withCount([
+                'similaritySuggestions as pending_similarities_count' => fn ($query) => $query
+                    ->where('status', IncidentSimilarity::STATUS_SUGGESTED),
+            ]))
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($query) use ($search) {
                     $query->where('reference', 'like', "%{$search}%")
@@ -49,6 +60,13 @@ class IncidentController extends Controller
             ->when(array_key_exists($severity, Incident::SEVERITIES), fn ($query) => $query->where('severity', $severity))
             ->when($zoneId, fn ($query) => $query->where('zone_id', $zoneId))
             ->when($open, fn ($query) => $query->open())
+            ->when(
+                $similaritiesAvailable && $similar,
+                fn ($query) => $query->whereHas(
+                    'similaritySuggestions',
+                    fn ($query) => $query->where('status', IncidentSimilarity::STATUS_SUGGESTED),
+                ),
+            )
             ->when(
                 $unassigned,
                 fn ($query) => $query->whereNull('assigned_to')->where('is_duplicate', false)
@@ -70,6 +88,8 @@ class IncidentController extends Controller
             'currentZone' => $zoneId ?: null,
             'currentUnassigned' => $unassigned,
             'currentOpen' => $open,
+            'currentSimilar' => $similar,
+            'similaritiesAvailable' => $similaritiesAvailable,
         ]);
     }
 
@@ -102,6 +122,8 @@ class IncidentController extends Controller
             'comment' => 'Incident créé depuis le Back Office.',
         ]);
 
+        DetectIncidentSimilarities::dispatch($incident->id);
+
         return redirect()
             ->route('back.incidents.show', $incident)
             ->with('success', "L'incident {$incident->reference} a été créé.");
@@ -109,7 +131,9 @@ class IncidentController extends Controller
 
     public function show(Incident $incident): View
     {
-        $incident->load([
+        $similaritiesAvailable = Schema::hasTable('incident_similarities');
+
+        $relations = [
             'user',
             'zone',
             'infrastructure',
@@ -120,11 +144,23 @@ class IncidentController extends Controller
             'comments.user',
             'statusHistories.user',
             'feedbacks.user',
-        ]);
+        ];
+
+        if ($similaritiesAvailable) {
+            $relations['similaritySuggestions'] = fn ($query) => $query
+                ->with(['similarIncident.zone', 'reviewer'])
+                ->orderByDesc('score');
+        }
+
+        $incident->load($relations);
 
         return view('back.incidents.show', [
             'incident' => $incident,
             'allowedTransitions' => $this->workflow->allowedTransitions($incident),
+            'similaritiesAvailable' => $similaritiesAvailable,
+            'recurring' => $similaritiesAvailable
+                ? $this->similarityService->recurringProblem($incident)
+                : null,
         ]);
     }
 

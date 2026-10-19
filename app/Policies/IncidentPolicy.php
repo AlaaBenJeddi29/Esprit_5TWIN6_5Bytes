@@ -42,4 +42,13 @@ class IncidentPolicy
     {
         return $user->canAccessBackOffice();
     }
+
+    /**
+     * Détection et décision sur les incidents similaires : réservées aux
+     * gestionnaires et administrateurs.
+     */
+    public function manageSimilarities(User $user, Incident $incident): bool
+    {
+        return $user->canAccessBackOffice();
+    }
 }

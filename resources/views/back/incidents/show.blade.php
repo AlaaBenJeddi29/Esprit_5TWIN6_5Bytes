@@ -73,7 +73,7 @@
                 <div class="flex items-center justify-between gap-3">
                     <h2 class="text-base font-medium text-gray-800 dark:text-white/90">Analyse heuristique locale</h2>
                     @if ($incident->ai_confidence !== null)
-                        <span class="text-xs text-gray-500 dark:text-gray-400">Confiance {{ $incident->ai_confidence }} %</span>
+                        <span class="text-xs text-gray-500 dark:text-gray-400">Confiance {{ (float) $incident->ai_confidence }} %</span>
                     @endif
                 </div>
                 <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">
@@ -89,6 +89,10 @@
                     </p>
                 @endif
             </div>
+
+            @if ($similaritiesAvailable)
+                @include('back.incidents._similarities')
+            @endif
 
             <div class="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
                 <div class="border-b border-gray-100 px-5 py-4 dark:border-gray-800 md:px-6">

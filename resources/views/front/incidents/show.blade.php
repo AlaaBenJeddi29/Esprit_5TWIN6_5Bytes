@@ -290,7 +290,7 @@
                             <p class="text-xs font-semibold uppercase tracking-wide text-body-color dark:text-dark-6">Analyse automatique locale</p>
                             <p class="mt-2 text-sm text-dark dark:text-white">{{ $incident->ai_summary }}</p>
                             @if ($incident->ai_confidence !== null)
-                                <p class="mt-2 text-xs text-body-color dark:text-dark-6">Confiance de la classification : {{ $incident->ai_confidence }} %. Cette analyse est indicative et n'utilise aucun fournisseur d'IA externe.</p>
+                                <p class="mt-2 text-xs text-body-color dark:text-dark-6">Confiance de la classification : {{ (float) $incident->ai_confidence }} %. Cette analyse est indicative et n'utilise aucun fournisseur d'IA externe.</p>
                             @endif
                         </div>
                     @endif

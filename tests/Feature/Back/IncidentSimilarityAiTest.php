@@ -12,6 +12,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Tests\TestCase;
 
 class IncidentSimilarityAiTest extends TestCase
@@ -24,10 +25,14 @@ class IncidentSimilarityAiTest extends TestCase
 
         config([
             'incident_similarity.ai_enabled' => true,
-            'services.xai.api_key' => 'test-key',
-            'services.xai.url' => 'https://api.x.ai/v1/chat/completions',
-            'services.xai.model' => 'grok-4.7',
-            'services.xai.timeout' => 5,
+            'services.groq.key' => 'test-key',
+            'services.groq.url' => 'https://api.groq.com/openai/v1/chat/completions',
+            'services.groq.model' => 'openai/gpt-oss-120b',
+            'services.groq.timeout' => 5,
+            'services.groq.connect_timeout' => 2,
+            'services.groq.max_completion_tokens' => 400,
+            'services.groq.reasoning_effort' => 'low',
+            'services.groq.delay_ms' => 0,
         ]);
     }
 
@@ -57,10 +62,13 @@ class IncidentSimilarityAiTest extends TestCase
             $data = $request->data();
             $prompt = (string) ($data['messages'][1]['content'] ?? '');
 
-            return ($data['model'] ?? null) === 'grok-4.7'
+            return ($data['model'] ?? null) === 'openai/gpt-oss-120b'
+                && str_contains($request->url(), 'api.groq.com')
                 && ($data['response_format']['type'] ?? null) === 'json_object'
+                && ($data['reasoning_effort'] ?? null) === 'low'
+                && ($data['max_completion_tokens'] ?? null) === 400
                 && str_contains($prompt, 'Signalement source A')
-                && str_contains($prompt, 'Signalement candidat B');
+                && str_contains($prompt, 'Candidat B (identifiant interne');
         });
     }
 
@@ -86,9 +94,14 @@ class IncidentSimilarityAiTest extends TestCase
 
     public function test_markdown_fenced_json_is_accepted(): void
     {
-        $this->fakeAiContent(fn (int $candidateId) => "```json\n"
-            .$this->verdict($candidateId, true, 77, 'Même problème constaté.')
-            ."\n```");
+        Http::fake(function (Request $request) {
+            $candidateId = $this->candidateIdsFromRequest($request)[0];
+            $content = "```json\n".$this->batchJson([
+                $this->verdictPayload($candidateId, true, 77, 'Même problème constaté.'),
+            ])."\n```";
+
+            return Http::response($this->completion($content));
+        });
 
         $source = $this->incident();
         $this->incident(['zone_id' => $source->zone_id]);
@@ -101,9 +114,16 @@ class IncidentSimilarityAiTest extends TestCase
 
     public function test_json_surrounded_by_text_is_accepted(): void
     {
-        $this->fakeAiContent(fn (int $candidateId) => "Voici mon analyse :\n"
-            .$this->verdict($candidateId, false, 42, 'Problèmes différents.')
-            ."\nFin de la réponse.");
+        Http::fake(function (Request $request) {
+            $candidateId = $this->candidateIdsFromRequest($request)[0];
+            $content = "Voici mon analyse :\n"
+                .$this->batchJson([
+                    $this->verdictPayload($candidateId, false, 42, 'Problèmes différents.'),
+                ])
+                ."\nFin de la réponse.";
+
+            return Http::response($this->completion($content));
+        });
 
         $source = $this->incident();
         $this->incident(['zone_id' => $source->zone_id]);
@@ -124,11 +144,11 @@ class IncidentSimilarityAiTest extends TestCase
         $suggestion = app(IncidentSimilarityService::class)->detect($source)->firstOrFail();
 
         $this->assertSame(IncidentSimilarity::METHOD_LOCAL_AI_UNAVAILABLE, $suggestion->method);
-        $this->assertStringContainsString('Analyse IA indisponible', (string) $suggestion->ai_justification);
+        $this->assertStringContainsString('(réponse invalide)', (string) $suggestion->ai_justification);
         $this->assertSame(IncidentSimilarity::STATUS_SUGGESTED, $suggestion->status);
     }
 
-    public function test_ai_is_only_called_for_the_five_highest_scoring_suggestions(): void
+    public function test_ai_is_only_called_for_the_five_highest_scoring_suggestions_in_one_request(): void
     {
         config([
             'incident_similarity.max_suggestions' => 7,
@@ -161,7 +181,8 @@ class IncidentSimilarityAiTest extends TestCase
         $suggestions = app(IncidentSimilarityService::class)->detect($source);
 
         $this->assertCount(7, $suggestions);
-        Http::assertSentCount(5);
+        Http::assertSentCount(1);
+        Http::assertSent(fn (Request $request): bool => count($this->candidateIdsFromRequest($request)) === 5);
 
         $annotatedIds = $suggestions
             ->where('method', IncidentSimilarity::METHOD_LOCAL_AI)
@@ -207,10 +228,72 @@ class IncidentSimilarityAiTest extends TestCase
         $this->assertFalse($candidate->fresh()->is_duplicate);
     }
 
-    public function test_a_rate_limited_ai_response_keeps_the_local_suggestion(): void
+    public function test_ai_failure_cannot_change_the_local_score(): void
     {
         Http::fake([
-            'api.x.ai/*' => Http::response('Too many requests', 429),
+            'api.groq.com/*' => Http::response('Too many requests', 429, ['Retry-After' => '0']),
+        ]);
+
+        $source = $this->incident();
+        $candidate = $this->incident(['zone_id' => $source->zone_id]);
+
+        $expectedScore = app(SimilarityScorer::class)->score($source, $candidate);
+
+        $suggestion = app(IncidentSimilarityService::class)->detect($source)->firstOrFail();
+
+        $this->assertSame($expectedScore, $suggestion->score);
+        $this->assertSame(IncidentSimilarity::METHOD_LOCAL_AI_UNAVAILABLE, $suggestion->method);
+        $this->assertSame('nouveau', $source->fresh()->status);
+    }
+
+    public function test_the_ai_key_is_never_logged(): void
+    {
+        Log::spy();
+        Http::fake([
+            'api.groq.com/*' => Http::response('Too many requests', 429, ['Retry-After' => '0']),
+        ]);
+
+        $source = $this->incident();
+        $this->incident(['zone_id' => $source->zone_id]);
+
+        app(IncidentSimilarityService::class)->detect($source);
+
+        Log::shouldNotHaveReceived('warning', function (string $message, array $context): bool {
+            return str_contains(json_encode($context, JSON_UNESCAPED_UNICODE) ?: '', 'test-key');
+        });
+    }
+
+    public function test_a_rate_limit_honours_retry_after_and_then_succeeds(): void
+    {
+        $calls = 0;
+
+        Http::fake(function (Request $request) use (&$calls) {
+            $calls++;
+
+            if ($calls === 1) {
+                return Http::response('Too many requests', 429, ['Retry-After' => '0']);
+            }
+
+            $candidateId = $this->candidateIdsFromRequest($request)[0];
+
+            return Http::response($this->completion($this->batchJson([
+                $this->verdictPayload($candidateId, true, 88, 'Même problème.'),
+            ])));
+        });
+
+        $source = $this->incident();
+        $this->incident(['zone_id' => $source->zone_id]);
+
+        $suggestion = app(IncidentSimilarityService::class)->detect($source)->firstOrFail();
+
+        $this->assertSame(IncidentSimilarity::METHOD_LOCAL_AI, $suggestion->method);
+        Http::assertSentCount(2);
+    }
+
+    public function test_a_repeated_rate_limit_retries_once_then_falls_back(): void
+    {
+        Http::fake([
+            'api.groq.com/*' => Http::response('Too many requests', 429, ['Retry-After' => '0']),
         ]);
 
         $source = $this->incident();
@@ -219,8 +302,127 @@ class IncidentSimilarityAiTest extends TestCase
         $suggestion = app(IncidentSimilarityService::class)->detect($source)->firstOrFail();
 
         $this->assertSame(IncidentSimilarity::METHOD_LOCAL_AI_UNAVAILABLE, $suggestion->method);
-        $this->assertStringContainsString('Analyse IA indisponible', (string) $suggestion->ai_justification);
-        $this->assertSame(IncidentSimilarity::STATUS_SUGGESTED, $suggestion->status);
+        $this->assertStringContainsString('(limite de débit)', (string) $suggestion->ai_justification);
+        Http::assertSentCount(2);
+    }
+
+    public function test_an_empty_response_is_retried_with_more_tokens_then_falls_back(): void
+    {
+        Http::fake([
+            'api.groq.com/*' => Http::response($this->completion('')),
+        ]);
+
+        $source = $this->incident();
+        $this->incident(['zone_id' => $source->zone_id]);
+
+        $suggestion = app(IncidentSimilarityService::class)->detect($source)->firstOrFail();
+
+        $this->assertSame(IncidentSimilarity::METHOD_LOCAL_AI_UNAVAILABLE, $suggestion->method);
+        $this->assertStringContainsString('(réponse vide)', (string) $suggestion->ai_justification);
+
+        $recorded = Http::recorded();
+        $this->assertCount(2, $recorded);
+        $this->assertGreaterThan(
+            $recorded[0][0]->data()['max_completion_tokens'],
+            $recorded[1][0]->data()['max_completion_tokens'],
+        );
+    }
+
+    public function test_a_truncated_response_is_retried_with_more_tokens_then_succeeds(): void
+    {
+        $calls = 0;
+
+        Http::fake(function (Request $request) use (&$calls) {
+            $calls++;
+
+            if ($calls === 1) {
+                return Http::response($this->completion('{"results": [', 'length'));
+            }
+
+            $candidateId = $this->candidateIdsFromRequest($request)[0];
+
+            return Http::response($this->completion($this->batchJson([
+                $this->verdictPayload($candidateId, true, 74, 'Même problème.'),
+            ])));
+        });
+
+        $source = $this->incident();
+        $this->incident(['zone_id' => $source->zone_id]);
+
+        $suggestion = app(IncidentSimilarityService::class)->detect($source)->firstOrFail();
+
+        $this->assertSame(IncidentSimilarity::METHOD_LOCAL_AI, $suggestion->method);
+
+        $recorded = Http::recorded();
+        $this->assertCount(2, $recorded);
+        $this->assertGreaterThan(
+            $recorded[0][0]->data()['max_completion_tokens'],
+            $recorded[1][0]->data()['max_completion_tokens'],
+        );
+    }
+
+    public function test_a_response_format_rejection_is_retried_without_the_parameter(): void
+    {
+        $calls = 0;
+
+        Http::fake(function (Request $request) use (&$calls) {
+            $calls++;
+
+            if ($calls === 1) {
+                return Http::response([
+                    'error' => ['message' => 'Failed to generate JSON. Please adjust your prompt.'],
+                ], 400);
+            }
+
+            $candidateId = $this->candidateIdsFromRequest($request)[0];
+
+            return Http::response($this->completion($this->batchJson([
+                $this->verdictPayload($candidateId, true, 83, 'Même problème.'),
+            ])));
+        });
+
+        $source = $this->incident();
+        $this->incident(['zone_id' => $source->zone_id]);
+
+        $suggestion = app(IncidentSimilarityService::class)->detect($source)->firstOrFail();
+
+        $this->assertSame(IncidentSimilarity::METHOD_LOCAL_AI, $suggestion->method);
+
+        $recorded = Http::recorded();
+        $this->assertCount(2, $recorded);
+        $this->assertArrayHasKey('response_format', $recorded[0][0]->data());
+        $this->assertArrayNotHasKey('response_format', $recorded[1][0]->data());
+        $this->assertStringContainsString(
+            'uniquement un objet JSON valide',
+            (string) ($recorded[1][0]->data()['messages'][0]['content'] ?? ''),
+        );
+    }
+
+    public function test_a_partial_batch_keeps_valid_items_and_falls_back_for_the_others(): void
+    {
+        Http::fake(function (Request $request) {
+            $candidateIds = $this->candidateIdsFromRequest($request);
+
+            return Http::response($this->completion($this->batchJson([
+                $this->verdictPayload($candidateIds[0], true, 90, 'Même problème.'),
+            ])));
+        });
+
+        $source = $this->incident();
+        $first = $this->incident(['zone_id' => $source->zone_id]);
+        $second = $this->incident(['zone_id' => $source->zone_id]);
+
+        $suggestions = app(IncidentSimilarityService::class)->detect($source);
+
+        $this->assertCount(2, $suggestions);
+        Http::assertSentCount(1);
+
+        $confirmed = $suggestions->firstWhere('similar_incident_id', $first->id);
+        $fallback = $suggestions->firstWhere('similar_incident_id', $second->id);
+
+        $this->assertSame(IncidentSimilarity::METHOD_LOCAL_AI, $confirmed?->method);
+        $this->assertSame(IncidentSimilarity::METHOD_LOCAL_AI_UNAVAILABLE, $fallback?->method);
+        $this->assertStringContainsString('(réponse invalide)', (string) $fallback?->ai_justification);
     }
 
     public function test_only_descriptions_are_sent_to_the_ai_provider(): void
@@ -255,11 +457,7 @@ class IncidentSimilarityAiTest extends TestCase
     public function test_invalid_json_keeps_the_local_suggestion(): void
     {
         Http::fake([
-            'api.x.ai/*' => Http::response([
-                'choices' => [[
-                    'message' => ['content' => 'Réponse non JSON.'],
-                ]],
-            ]),
+            'api.groq.com/*' => Http::response($this->completion('Réponse non JSON.')),
         ]);
 
         $source = $this->incident();
@@ -268,17 +466,23 @@ class IncidentSimilarityAiTest extends TestCase
         $suggestion = app(IncidentSimilarityService::class)->detect($source)->firstOrFail();
 
         $this->assertSame(IncidentSimilarity::METHOD_LOCAL_AI_UNAVAILABLE, $suggestion->method);
+        $this->assertStringContainsString('(réponse invalide)', (string) $suggestion->ai_justification);
         $this->assertSame(IncidentSimilarity::STATUS_SUGGESTED, $suggestion->status);
+        Http::assertSentCount(1);
     }
 
     public function test_an_invalid_ai_payload_keeps_the_local_suggestion(): void
     {
-        $this->fakeAiContent(fn (int $candidateId) => json_encode([
-            'candidate_id' => $candidateId,
-            'is_same_issue' => 'oui',
-            'confidence' => 140,
-            'justification' => '',
-        ]));
+        Http::fake(function (Request $request) {
+            $candidateId = $this->candidateIdsFromRequest($request)[0];
+
+            return Http::response($this->completion($this->batchJson([[
+                'candidate_id' => $candidateId,
+                'is_same_issue' => 'oui',
+                'confidence' => 140,
+                'justification' => '',
+            ]])));
+        });
 
         $source = $this->incident();
         $this->incident(['zone_id' => $source->zone_id]);
@@ -287,6 +491,7 @@ class IncidentSimilarityAiTest extends TestCase
 
         $this->assertSame(IncidentSimilarity::METHOD_LOCAL_AI_UNAVAILABLE, $suggestion->method);
         $this->assertSame(IncidentSimilarity::STATUS_SUGGESTED, $suggestion->status);
+        $this->assertStringContainsString('(réponse invalide)', (string) $suggestion->ai_justification);
     }
 
     public function test_an_ai_timeout_keeps_the_local_suggestion(): void
@@ -299,13 +504,13 @@ class IncidentSimilarityAiTest extends TestCase
         $suggestion = app(IncidentSimilarityService::class)->detect($source)->firstOrFail();
 
         $this->assertSame(IncidentSimilarity::METHOD_LOCAL_AI_UNAVAILABLE, $suggestion->method);
-        $this->assertStringContainsString('Analyse IA indisponible', (string) $suggestion->ai_justification);
+        $this->assertStringContainsString('(délai dépassé)', (string) $suggestion->ai_justification);
     }
 
     public function test_an_ai_error_status_keeps_the_local_suggestion(): void
     {
         Http::fake([
-            'api.x.ai/*' => Http::response('Service unavailable', 503),
+            'api.groq.com/*' => Http::response('Service unavailable', 503),
         ]);
 
         $source = $this->incident();
@@ -315,12 +520,13 @@ class IncidentSimilarityAiTest extends TestCase
 
         $this->assertSame(IncidentSimilarity::METHOD_LOCAL_AI_UNAVAILABLE, $suggestion->method);
         $this->assertSame(IncidentSimilarity::STATUS_SUGGESTED, $suggestion->status);
+        Http::assertSentCount(1);
     }
 
     public function test_invalid_credentials_keep_the_local_suggestion(): void
     {
         Http::fake([
-            'api.x.ai/*' => Http::response('Unauthorized', 401),
+            'api.groq.com/*' => Http::response('Unauthorized', 401),
         ]);
 
         $source = $this->incident();
@@ -329,6 +535,37 @@ class IncidentSimilarityAiTest extends TestCase
         $suggestion = app(IncidentSimilarityService::class)->detect($source)->firstOrFail();
 
         $this->assertSame(IncidentSimilarity::METHOD_LOCAL_AI_UNAVAILABLE, $suggestion->method);
+        Http::assertSentCount(1);
+    }
+
+    public function test_a_forbidden_response_keeps_the_local_suggestion(): void
+    {
+        Http::fake([
+            'api.groq.com/*' => Http::response('Forbidden', 403),
+        ]);
+
+        $source = $this->incident();
+        $this->incident(['zone_id' => $source->zone_id]);
+
+        $suggestion = app(IncidentSimilarityService::class)->detect($source)->firstOrFail();
+
+        $this->assertSame(IncidentSimilarity::METHOD_LOCAL_AI_UNAVAILABLE, $suggestion->method);
+        Http::assertSentCount(1);
+    }
+
+    public function test_a_server_error_keeps_the_local_suggestion(): void
+    {
+        Http::fake([
+            'api.groq.com/*' => Http::response('Internal server error', 500),
+        ]);
+
+        $source = $this->incident();
+        $this->incident(['zone_id' => $source->zone_id]);
+
+        $suggestion = app(IncidentSimilarityService::class)->detect($source)->firstOrFail();
+
+        $this->assertSame(IncidentSimilarity::METHOD_LOCAL_AI_UNAVAILABLE, $suggestion->method);
+        $this->assertSame(IncidentSimilarity::STATUS_SUGGESTED, $suggestion->status);
         Http::assertSentCount(1);
     }
 
@@ -349,7 +586,7 @@ class IncidentSimilarityAiTest extends TestCase
 
     public function test_ai_is_not_called_without_an_api_key(): void
     {
-        config(['services.xai.api_key' => null]);
+        config(['services.groq.key' => null]);
         Http::fake();
 
         $source = $this->incident();
@@ -362,37 +599,225 @@ class IncidentSimilarityAiTest extends TestCase
         Http::assertNothingSent();
     }
 
-    private function fakeAiContent(callable $content): void
+    public function test_a_missing_api_key_logs_a_warning_and_falls_back_without_throwing(): void
     {
-        Http::fake(function (Request $request) use ($content) {
-            $candidateId = $this->candidateIdFromRequest($request);
+        Log::spy();
+        config(['services.groq.key' => '   ']);
+        Http::fake();
 
-            return Http::response([
-                'choices' => [[
-                    'message' => ['content' => $content($candidateId)],
-                ]],
-            ]);
+        $source = $this->incident();
+        $this->incident(['zone_id' => $source->zone_id]);
+
+        $suggestion = app(IncidentSimilarityService::class)->detect($source)->firstOrFail();
+
+        $this->assertSame(IncidentSimilarity::METHOD_LOCAL, $suggestion->method);
+        $this->assertNull($suggestion->ai_justification);
+        Http::assertNothingSent();
+        Log::shouldHaveReceived('warning')
+            ->withArgs(fn (string $message, array $context): bool => $message === 'Incident similarity AI key is missing or empty.'
+                && ($context['provider'] ?? null) === 'groq'
+                && ! array_key_exists('key', $context))
+            ->once();
+    }
+
+    public function test_provider_errors_are_logged_with_status_reason_and_provider_message(): void
+    {
+        Log::spy();
+        Http::fake([
+            'api.groq.com/*' => Http::response([
+                'error' => ['message' => 'Invalid API Key'],
+            ], 401),
+        ]);
+
+        $source = $this->incident();
+        $this->incident(['zone_id' => $source->zone_id]);
+
+        app(IncidentSimilarityService::class)->detect($source);
+
+        Log::shouldHaveReceived('warning')
+            ->withArgs(fn (string $message, array $context): bool => $message === 'Incident similarity AI request failed.'
+                && ($context['status'] ?? null) === 401
+                && ($context['reason'] ?? null) === 'http_error'
+                && ($context['provider_message'] ?? null) === 'Invalid API Key'
+                && isset($context['duration_ms']))
+            ->once();
+    }
+
+    public function test_requests_target_the_groq_endpoint_and_the_configured_model(): void
+    {
+        $this->fakeAiContent(fn (int $candidateId) => $this->verdict(
+            $candidateId,
+            true,
+            80,
+            'Même problème.',
+        ));
+
+        $source = $this->incident();
+        $this->incident(['zone_id' => $source->zone_id]);
+
+        app(IncidentSimilarityService::class)->detect($source);
+
+        Http::assertSent(function (Request $request): bool {
+            $data = $request->data();
+            $systemPrompt = (string) ($data['messages'][0]['content'] ?? '');
+
+            return str_contains($request->url(), 'api.groq.com')
+                && parse_url($request->url(), PHP_URL_PATH) === '/openai/v1/chat/completions'
+                && ($data['model'] ?? null) === config('services.groq.model')
+                && str_contains($systemPrompt, 'JSON');
         });
     }
 
-    private function candidateIdFromRequest(Request $request): int
+    public function test_a_404_keeps_the_local_suggestion(): void
+    {
+        Http::fake([
+            'api.groq.com/*' => Http::response('Not found', 404),
+        ]);
+
+        $source = $this->incident();
+        $this->incident(['zone_id' => $source->zone_id]);
+
+        $suggestion = app(IncidentSimilarityService::class)->detect($source)->firstOrFail();
+
+        $this->assertSame(IncidentSimilarity::METHOD_LOCAL_AI_UNAVAILABLE, $suggestion->method);
+        $this->assertSame(IncidentSimilarity::STATUS_SUGGESTED, $suggestion->status);
+        Http::assertSentCount(1);
+    }
+
+    public function test_an_out_of_enum_suggested_classification_keeps_the_local_suggestion(): void
+    {
+        $this->fakeAiContent(fn (int $candidateId) => $this->verdict(
+            $candidateId,
+            true,
+            90,
+            'Même problème.',
+            'inondation',
+            'extreme',
+        ));
+
+        $source = $this->incident();
+        $this->incident(['zone_id' => $source->zone_id]);
+
+        $suggestion = app(IncidentSimilarityService::class)->detect($source)->firstOrFail();
+
+        $this->assertSame(IncidentSimilarity::METHOD_LOCAL_AI_UNAVAILABLE, $suggestion->method);
+        $this->assertStringContainsString('(réponse invalide)', (string) $suggestion->ai_justification);
+        $this->assertSame('nouveau', $source->fresh()->status);
+    }
+
+    public function test_valid_classification_proposals_are_advisory_only(): void
+    {
+        $this->fakeAiContent(fn (int $candidateId) => $this->verdict(
+            $candidateId,
+            true,
+            88,
+            'Même problème constaté.',
+            'coupure',
+            'critique',
+        ));
+
+        $source = $this->incident();
+        $this->incident(['zone_id' => $source->zone_id]);
+
+        $suggestion = app(IncidentSimilarityService::class)->detect($source)->firstOrFail();
+
+        $this->assertSame(IncidentSimilarity::METHOD_LOCAL_AI, $suggestion->method);
+        $this->assertStringContainsString('Proposition indicative (non appliquée)', (string) $suggestion->ai_justification);
+        $this->assertStringContainsString('Coupure', (string) $suggestion->ai_justification);
+        $this->assertStringContainsString('Critique', (string) $suggestion->ai_justification);
+        $this->assertSame('fuite', $source->fresh()->type);
+        $this->assertSame('haute', $source->fresh()->severity);
+    }
+
+    private function fakeAiContent(callable $content): void
+    {
+        Http::fake(function (Request $request) use ($content) {
+            $items = [];
+
+            foreach ($this->candidateIdsFromRequest($request) as $candidateId) {
+                $decoded = json_decode((string) $content($candidateId), true);
+
+                if (is_array($decoded)) {
+                    $items[] = $decoded;
+                }
+            }
+
+            return Http::response($this->completion($this->batchJson($items)));
+        });
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function candidateIdsFromRequest(Request $request): array
     {
         $messages = $request->data()['messages'] ?? [];
         $prompt = (string) ($messages[1]['content'] ?? '');
 
-        preg_match('/Signalement candidat B \(identifiant interne (\d+)\)/u', $prompt, $matches);
+        preg_match_all('/--- Candidat B \(identifiant interne (\d+)\) ---/u', $prompt, $matches);
 
-        return (int) ($matches[1] ?? 0);
+        return array_map('intval', $matches[1]);
     }
 
-    private function verdict(int $candidateId, bool $sameIssue, int $confidence, string $justification): string
+    /**
+     * @param  array<string, mixed>  $verdict
+     */
+    private function batchJson(array $verdict): string
     {
-        return json_encode([
+        return json_encode(['results' => $verdict], JSON_UNESCAPED_UNICODE) ?: '{}';
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function completion(string $content, string $finishReason = 'stop'): array
+    {
+        return [
+            'choices' => [[
+                'message' => ['content' => $content],
+                'finish_reason' => $finishReason,
+            ]],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function verdictPayload(
+        int $candidateId,
+        bool $sameIssue,
+        int $confidence,
+        string $justification,
+        ?string $suggestedType = null,
+        ?string $suggestedSeverity = null,
+    ): array {
+        $payload = [
             'candidate_id' => $candidateId,
             'is_same_issue' => $sameIssue,
             'confidence' => $confidence,
             'justification' => $justification,
-        ], JSON_UNESCAPED_UNICODE);
+        ];
+
+        if ($suggestedType !== null || $suggestedSeverity !== null) {
+            $payload['suggested_type'] = $suggestedType;
+            $payload['suggested_severity'] = $suggestedSeverity;
+        }
+
+        return $payload;
+    }
+
+    private function verdict(
+        int $candidateId,
+        bool $sameIssue,
+        int $confidence,
+        string $justification,
+        ?string $suggestedType = null,
+        ?string $suggestedSeverity = null,
+    ): string {
+        return json_encode(
+            $this->verdictPayload($candidateId, $sameIssue, $confidence, $justification, $suggestedType, $suggestedSeverity),
+            JSON_UNESCAPED_UNICODE,
+        ) ?: '{}';
     }
 
     /**

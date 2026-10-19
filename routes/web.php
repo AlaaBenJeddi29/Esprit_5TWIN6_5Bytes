@@ -11,6 +11,7 @@ use App\Http\Controllers\Back\GestionnaireController;
 use App\Http\Controllers\Back\IncidentController as BackIncidentController;
 use App\Http\Controllers\Back\IncidentDashboardController;
 use App\Http\Controllers\Back\IncidentMapController;
+use App\Http\Controllers\Back\IncidentSimilarityController;
 use App\Http\Controllers\Back\InfrastructureController;
 use App\Http\Controllers\Back\MaintenanceController;
 use App\Http\Controllers\Back\ProjectController;
@@ -158,6 +159,15 @@ Route::middleware(['auth', 'verified', 'role:gestionnaire,admin'])
             ->name('incidents.status');
         Route::post('incidents/{incident}/commentaires', [BackIncidentController::class, 'storeComment'])
             ->name('incidents.comments.store');
+
+        // Incidents similaires : détection à la demande et décision de gestionnaire
+        Route::post('incidents/{incident}/similarities/detect', [IncidentSimilarityController::class, 'detect'])
+            ->middleware('throttle:6,1')
+            ->name('incidents.similarities.detect');
+        Route::patch('incidents/{incident}/similarities/{similarity}', [IncidentSimilarityController::class, 'decide'])
+            ->middleware('throttle:30,1')
+            ->name('incidents.similarities.decide');
+
         Route::get('incidents/{incident}/photos/{photo}', [BackIncidentController::class, 'showPhoto'])
             ->name('incidents.photos.show');
         Route::get('incidents/{incident}/photos/{photo}/telecharger', [BackIncidentController::class, 'downloadPhoto'])

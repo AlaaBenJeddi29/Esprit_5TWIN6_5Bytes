@@ -24,7 +24,7 @@ class IncidentSimilarityService
 {
     public function __construct(
         private readonly SimilarityScorer $scorer,
-        private readonly GrokAIService $ai,
+        private readonly GroqAIService $ai,
     ) {}
 
     /**
@@ -44,8 +44,16 @@ class IncidentSimilarityService
      * @return list<array{
      *     incident: Incident,
      *     score: int,
-     *     ai: array{candidate_id: int, is_same_issue: bool, confidence: int, justification: string}|null,
-     *     ai_attempted: bool
+     *     ai: array{
+     *         candidate_id: int,
+     *         is_same_issue: bool,
+     *         confidence: int,
+     *         justification: string,
+     *         suggested_type: string|null,
+     *         suggested_severity: string|null
+     *     }|null,
+     *     ai_attempted: bool,
+     *     ai_failure: string|null
      * }>
      */
     public function analyze(Incident $incident, bool $allowAi = true): array
@@ -64,6 +72,7 @@ class IncidentSimilarityService
                     'score' => $score,
                     'ai' => null,
                     'ai_attempted' => false,
+                    'ai_failure' => null,
                 ];
             }
         }
@@ -74,10 +83,16 @@ class IncidentSimilarityService
 
         if ($allowAi && $this->ai->enabled()) {
             $aiLimit = min(count($scored), max(1, (int) config('incident_similarity.ai_max_candidates', 5)));
+            $aiCandidates = array_slice(array_column($scored, 'incident'), 0, $aiLimit);
+
+            $batch = $this->ai->confirmBatch($incident, $aiCandidates);
 
             for ($index = 0; $index < $aiLimit; $index++) {
-                $scored[$index]['ai_attempted'] = true;
-                $scored[$index]['ai'] = $this->ai->confirm($incident, $scored[$index]['incident']);
+                $candidateId = (int) $scored[$index]['incident']->getKey();
+
+                $scored[$index]['ai_attempted'] = $batch['attempted'];
+                $scored[$index]['ai'] = $batch['results'][$candidateId] ?? null;
+                $scored[$index]['ai_failure'] = $batch['failures'][$candidateId] ?? null;
             }
         }
 
@@ -117,8 +132,16 @@ class IncidentSimilarityService
      * @param  list<array{
      *     incident: Incident,
      *     score: int,
-     *     ai: array{candidate_id: int, is_same_issue: bool, confidence: int, justification: string}|null,
-     *     ai_attempted: bool
+     *     ai: array{
+     *         candidate_id: int,
+     *         is_same_issue: bool,
+     *         confidence: int,
+     *         justification: string,
+     *         suggested_type: string|null,
+     *         suggested_severity: string|null
+     *     }|null,
+     *     ai_attempted: bool,
+     *     ai_failure: string|null
      * }>  $suggestions
      * @return Collection<int, IncidentSimilarity>
      */
@@ -153,6 +176,7 @@ class IncidentSimilarityService
 
                 $ai = $suggestion['ai'] ?? null;
                 $aiAttempted = (bool) ($suggestion['ai_attempted'] ?? false);
+                $aiFailure = $suggestion['ai_failure'] ?? null;
 
                 $method = match (true) {
                     is_array($ai) && $ai['is_same_issue'] => IncidentSimilarity::METHOD_LOCAL_AI,
@@ -168,7 +192,9 @@ class IncidentSimilarityService
                     'method' => $method,
                     'ai_justification' => match (true) {
                         is_array($ai) => $this->formatAiJustification($ai),
-                        $aiAttempted => 'Analyse IA indisponible ; la suggestion locale est conservée.',
+                        $aiAttempted => GroqAIService::failureJustification(
+                            is_string($aiFailure) ? $aiFailure : GroqAIService::FAILURE_UNAVAILABLE,
+                        ),
                         default => null,
                     },
                     'status' => IncidentSimilarity::STATUS_SUGGESTED,
@@ -214,15 +240,157 @@ class IncidentSimilarityService
     }
 
     /**
-     * @param  array{candidate_id: int, is_same_issue: bool, confidence: int, justification: string}  $ai
+     * Rejoue uniquement la confirmation IA des suggestions encore en attente
+     * dont la méthode est local_ai_unavailable. Les suggestions déjà décidées
+     * par un gestionnaire ou déjà confirmées par l'IA ne sont jamais touchées.
+     *
+     * @return array{
+     *     enabled: bool,
+     *     processed: int,
+     *     confirmed: int,
+     *     negative: int,
+     *     fallback: int,
+     *     reasons: array<string, int>
+     * }
+     */
+    public function retryFailedAi(): array
+    {
+        $summary = [
+            'enabled' => $this->ai->enabled(),
+            'processed' => 0,
+            'confirmed' => 0,
+            'negative' => 0,
+            'fallback' => 0,
+            'reasons' => [],
+        ];
+
+        if (! $summary['enabled']) {
+            return $summary;
+        }
+
+        $groups = IncidentSimilarity::query()
+            ->where('status', IncidentSimilarity::STATUS_SUGGESTED)
+            ->where('method', IncidentSimilarity::METHOD_LOCAL_AI_UNAVAILABLE)
+            ->with(['incident', 'similarIncident'])
+            ->orderBy('incident_id')
+            ->orderByDesc('score')
+            ->get()
+            ->groupBy('incident_id');
+
+        foreach ($groups as $group) {
+            $incident = $group->first()?->incident;
+
+            if ($incident === null) {
+                continue;
+            }
+
+            foreach ($group->chunk(5) as $chunk) {
+                $candidates = $chunk
+                    ->map(fn (IncidentSimilarity $row) => $row->similarIncident)
+                    ->filter()
+                    ->values()
+                    ->all();
+
+                if ($candidates === []) {
+                    continue;
+                }
+
+                $batch = $this->ai->confirmBatch($incident, $candidates);
+
+                if (! $batch['attempted']) {
+                    break;
+                }
+
+                foreach ($chunk as $row) {
+                    $candidateId = (int) $row->similar_incident_id;
+                    $ai = $batch['results'][$candidateId] ?? null;
+
+                    if (is_array($ai)) {
+                        $updated = IncidentSimilarity::query()
+                            ->whereKey($row->getKey())
+                            ->where('status', IncidentSimilarity::STATUS_SUGGESTED)
+                            ->where('method', IncidentSimilarity::METHOD_LOCAL_AI_UNAVAILABLE)
+                            ->update([
+                                'method' => $ai['is_same_issue']
+                                    ? IncidentSimilarity::METHOD_LOCAL_AI
+                                    : IncidentSimilarity::METHOD_LOCAL_AI_NEGATIVE,
+                                'ai_justification' => $this->formatAiJustification($ai),
+                                'updated_at' => now(),
+                            ]);
+
+                        if ($updated === 0) {
+                            continue;
+                        }
+
+                        $summary['processed']++;
+
+                        if ($ai['is_same_issue']) {
+                            $summary['confirmed']++;
+                        } else {
+                            $summary['negative']++;
+                        }
+
+                        continue;
+                    }
+
+                    $reason = $batch['failures'][$candidateId] ?? GroqAIService::FAILURE_UNAVAILABLE;
+
+                    $updated = IncidentSimilarity::query()
+                        ->whereKey($row->getKey())
+                        ->where('status', IncidentSimilarity::STATUS_SUGGESTED)
+                        ->where('method', IncidentSimilarity::METHOD_LOCAL_AI_UNAVAILABLE)
+                        ->update([
+                            'ai_justification' => GroqAIService::failureJustification($reason),
+                            'updated_at' => now(),
+                        ]);
+
+                    if ($updated === 0) {
+                        continue;
+                    }
+
+                    $summary['processed']++;
+                    $summary['fallback']++;
+                    $summary['reasons'][$reason] = ($summary['reasons'][$reason] ?? 0) + 1;
+                }
+            }
+        }
+
+        return $summary;
+    }
+
+    /**
+     * @param  array{
+     *     candidate_id: int,
+     *     is_same_issue: bool,
+     *     confidence: int,
+     *     justification: string,
+     *     suggested_type: string|null,
+     *     suggested_severity: string|null
+     * }  $ai
      */
     private function formatAiJustification(array $ai): string
     {
-        return sprintf(
+        $justification = sprintf(
             '%s. Indice déclaré par le modèle : %d/100 (non calibré, avis indicatif). %s',
             $ai['is_same_issue'] ? 'IA : même problème probable' : 'IA : problème probablement différent',
             $ai['confidence'],
             $ai['justification'],
         );
+
+        $proposals = [];
+
+        if ($ai['suggested_type'] !== null) {
+            $proposals[] = 'type '.Incident::TYPES[$ai['suggested_type']];
+        }
+
+        if ($ai['suggested_severity'] !== null) {
+            $proposals[] = 'gravité '.Incident::SEVERITIES[$ai['suggested_severity']];
+        }
+
+        if ($proposals !== []) {
+            $justification .= ' Proposition indicative (non appliquée) : '.implode(', ', $proposals).'.';
+        }
+
+        return $justification;
     }
 }

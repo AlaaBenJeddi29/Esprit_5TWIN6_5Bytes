@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Incident\StoreIncidentCommentRequest;
 use App\Http\Requests\Incident\StoreIncidentPhotoRequest;
 use App\Http\Requests\Incident\StoreIncidentRequest;
+use App\Jobs\DetectIncidentSimilarities;
 use App\Models\Incident\Incident;
 use App\Models\Infrastructure\Infrastructure;
 use App\Models\Infrastructure\Zone;
@@ -88,6 +89,8 @@ class IncidentController extends Controller
                 'ai_summary' => $classification['summary'].' Doublon probable du signalement '.$duplicate->reference.'.',
             ]);
         }
+
+        DetectIncidentSimilarities::dispatch($incident->id);
 
         return redirect()
             ->route('citizen.incidents.show', $incident)
