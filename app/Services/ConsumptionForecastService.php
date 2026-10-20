@@ -36,7 +36,7 @@ class ConsumptionForecastService
 
         if (count($readings) < 12) {
             \Illuminate\Support\Facades\Log::warning(
-                "Insufficient historical data for zone {$zone->id} ({$zone->nom}): {count($readings)} months available, 12+ required for Holt-Winters.",
+                "Insufficient historical data for zone {$zone->id} ({$zone->nom}): ".count($readings).' months available, 12+ required for Holt-Winters.',
                 ['zone_id' => $zone->id, 'data_points' => count($readings)]
             );
 

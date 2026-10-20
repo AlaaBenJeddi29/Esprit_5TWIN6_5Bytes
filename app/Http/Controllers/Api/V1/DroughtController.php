@@ -31,21 +31,16 @@ class DroughtController extends Controller
             ->orderBy('periode', 'desc')
             ->first();
 
-        // Next 6 months of forecasts (validate they are newer than latest history)
+        // Next 6 months of forecasts (newer than the latest history and current month)
+        $latestPeriod = $latestHistorical?->periode;
+
         $forecasts = ConsumptionForecast::query()
             ->where('zone_id', $zone->id)
             ->where('forecast_month', '>=', Carbon::now()->startOfMonth())
+            ->when($latestPeriod, fn ($query) => $query->where('forecast_month', '>', $latestPeriod->toDateString()))
             ->orderBy('forecast_month')
             ->limit(6)
-            ->get()
-            ->filter(function ($forecast) use ($latestHistorical) {
-                // Ensure forecast month is actually after the latest historical reading
-                if ($latestHistorical) {
-                    return $forecast->forecast_month > $latestHistorical->periode;
-                }
-                return true;
-            })
-            ->values();
+            ->get();
 
         $forecastData = $forecasts->map(fn ($forecast) => [
             'date' => $forecast->forecast_month->format('Y-m-d'),
