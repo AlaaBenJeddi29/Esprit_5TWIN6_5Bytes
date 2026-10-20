@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Back;
 
+use App\Http\Controllers\Concerns\ResolvesListingFilters;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreReportRequest;
 use App\Http\Requests\UpdateReportRequest;
@@ -12,27 +13,52 @@ use Illuminate\View\View;
 
 class ReportController extends Controller
 {
+    use ResolvesListingFilters;
+
     /**
-     * Liste paginée des signalements, avec filtre optionnel par statut.
+     * Liste paginée des signalements, avec recherche, type, statut et période.
      */
     public function index(Request $request): View
     {
+        $search = $request->string('search')->toString();
         $status = $request->string('status')->toString();
+        $type = $request->string('type')->toString();
+        ['from' => $from, 'to' => $to] = $this->listingDateRange($request);
+        $perPage = $this->listingPerPage($request, 10);
 
         $reports = Report::query()
             ->with('user')
+            ->when($search !== '', function ($query) use ($search) {
+                $query->where(function ($query) use ($search) {
+                    $query->where('title', 'like', "%{$search}%")
+                        ->orWhere('description', 'like', "%{$search}%")
+                        ->orWhere('address', 'like', "%{$search}%");
+                });
+            })
             ->when(
                 array_key_exists($status, Report::STATUSES),
                 fn ($query) => $query->where('status', $status)
             )
+            ->when(
+                array_key_exists($type, Report::TYPES),
+                fn ($query) => $query->where('type', $type)
+            )
+            ->when($from !== null, fn ($query) => $query->whereDate('created_at', '>=', $from))
+            ->when($to !== null, fn ($query) => $query->whereDate('created_at', '<=', $to))
             ->latest()
-            ->paginate(10)
+            ->paginate($perPage)
             ->withQueryString();
 
         return view('back.reports.index', [
             'reports' => $reports,
             'statuses' => Report::STATUSES,
+            'types' => Report::TYPES,
+            'search' => $search,
             'currentStatus' => $status,
+            'currentType' => $type,
+            'from' => $from,
+            'to' => $to,
+            'perPage' => $perPage,
         ]);
     }
 

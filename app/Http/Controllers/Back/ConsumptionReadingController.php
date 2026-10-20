@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Back;
 
 use App\Exports\Drought\ConsumptionReadingExport;
+use App\Http\Controllers\Concerns\ResolvesListingFilters;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Drought\StoreConsumptionReadingRequest;
 use App\Http\Requests\Drought\UpdateConsumptionReadingRequest;
@@ -22,6 +23,8 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class ConsumptionReadingController extends Controller
 {
+    use ResolvesListingFilters;
+
     public function __construct(
         private readonly DroughtAnalyzer $analyzer,
         private readonly ConsumptionForecastService $forecastService,
@@ -31,18 +34,25 @@ class ConsumptionReadingController extends Controller
     public function index(Request $request): View
     {
         $zoneId = $request->integer('zone_id');
+        ['from' => $from, 'to' => $to] = $this->listingDateRange($request);
+        $perPage = $this->listingPerPage($request);
 
         $readings = ConsumptionReading::query()
             ->with('zone')
             ->when($zoneId, fn ($query) => $query->where('zone_id', $zoneId))
+            ->when($from !== null, fn ($query) => $query->whereDate('periode', '>=', $from))
+            ->when($to !== null, fn ($query) => $query->whereDate('periode', '<=', $to))
             ->orderByDesc('periode')
-            ->paginate(20)
+            ->paginate($perPage)
             ->withQueryString();
 
         return view('back.drought.consumption.index', [
             'readings' => $readings,
             'zones' => Zone::orderBy('nom')->get(),
             'currentZone' => $zoneId ?: null,
+            'from' => $from,
+            'to' => $to,
+            'perPage' => $perPage,
         ]);
     }
 

@@ -169,11 +169,11 @@
     {{-- Phases --}}
     <div class="mt-6 overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
         <div class="flex items-center justify-between border-b border-gray-100 px-5 py-3 dark:border-gray-800">
-            <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-300">Phases ({{ $project->projectPhases->count() }})</h2>
+            <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-300">Phases ({{ $phases->total() }})</h2>
             <a href="{{ route('back.projects.phases.create', $project) }}" class="text-xs font-medium text-brand-500 hover:underline dark:text-brand-400">Ajouter une phase</a>
         </div>
 
-        @if ($project->projectPhases->isNotEmpty())
+        @if ($phases->isNotEmpty())
             <div class="overflow-x-auto">
                 <table class="w-full">
                     <thead>
@@ -187,7 +187,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach ($project->projectPhases as $phase)
+                        @foreach ($phases as $phase)
                             <tr class="border-b border-gray-100 transition-colors last:border-0 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/[0.02]">
                                 <td class="px-5 py-3 text-sm font-medium text-gray-800 dark:text-white/90">{{ $phase->nom }}</td>
                                 <td class="px-5 py-3 text-sm text-gray-500 dark:text-gray-400">{{ $phase->contractor?->nom ?? '—' }}</td>
@@ -216,6 +216,8 @@
                     </tbody>
                 </table>
             </div>
+
+            <x-back.pagination :paginator="$phases" label="phases" :showPerPage="false" />
         @else
             <div class="p-5">
                 <x-back.empty-state title="Aucune phase" message="Décomposez ce projet en phases de travaux." />
@@ -226,11 +228,11 @@
     {{-- Financements --}}
     <div class="mt-6 overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
         <div class="flex items-center justify-between border-b border-gray-100 px-5 py-3 dark:border-gray-800">
-            <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-300">Financements ({{ $project->fundings->count() }})</h2>
+            <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-300">Financements ({{ $fundings->total() }})</h2>
             <a href="{{ route('back.projects.fundings.create', $project) }}" class="text-xs font-medium text-brand-500 hover:underline dark:text-brand-400">Ajouter un financement</a>
         </div>
 
-        @if ($project->fundings->isNotEmpty())
+        @if ($fundings->isNotEmpty())
             <div class="overflow-x-auto">
                 <table class="w-full">
                     <thead>
@@ -243,7 +245,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach ($project->fundings as $funding)
+                        @foreach ($fundings as $funding)
                             <tr class="border-b border-gray-100 transition-colors last:border-0 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/[0.02]">
                                 <td class="px-5 py-3 text-sm font-medium text-gray-800 dark:text-white/90">{{ $funding->sourceLabel() }}</td>
                                 <td class="px-5 py-3 text-sm text-gray-500 dark:text-gray-400">{{ $funding->donateur?->name ?? '—' }}</td>
@@ -261,6 +263,8 @@
                     </tbody>
                 </table>
             </div>
+
+            <x-back.pagination :paginator="$fundings" label="financements" :showPerPage="false" />
         @else
             <div class="p-5">
                 <x-back.empty-state title="Aucun financement" message="Enregistrez les sources de financement du projet." />
@@ -271,11 +275,11 @@
     {{-- Documents --}}
     <div class="mt-6 overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
         <div class="flex items-center justify-between border-b border-gray-100 px-5 py-3 dark:border-gray-800">
-            <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-300">Documents ({{ $project->projectDocuments->count() }})</h2>
+            <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-300">Documents ({{ $documents->total() }})</h2>
             <a href="{{ route('back.projects.documents.create', $project) }}" class="text-xs font-medium text-brand-500 hover:underline dark:text-brand-400">Ajouter un document</a>
         </div>
 
-        @if ($project->projectDocuments->isNotEmpty())
+        @if ($documents->isNotEmpty())
             <div class="overflow-x-auto">
                 <table class="w-full">
                     <thead>
@@ -287,7 +291,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach ($project->projectDocuments as $document)
+                        @foreach ($documents as $document)
                             <tr class="border-b border-gray-100 transition-colors last:border-0 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/[0.02]">
                                 <td class="px-5 py-3 text-sm font-medium text-gray-800 dark:text-white/90">{{ $document->titre }}</td>
                                 <td class="px-5 py-3 text-sm text-gray-500 dark:text-gray-400">{{ $document->typeLabel() }}</td>
@@ -304,6 +308,8 @@
                     </tbody>
                 </table>
             </div>
+
+            <x-back.pagination :paginator="$documents" label="documents" :showPerPage="false" />
         @else
             <div class="p-5">
                 <x-back.empty-state title="Aucun document" message="Référencez les pièces justificatives du projet." />

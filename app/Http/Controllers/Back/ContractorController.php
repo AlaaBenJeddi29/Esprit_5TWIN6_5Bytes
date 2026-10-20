@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Back;
 
+use App\Http\Controllers\Concerns\ResolvesListingFilters;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Project\StoreContractorRequest;
 use App\Http\Requests\Project\UpdateContractorRequest;
@@ -12,9 +13,20 @@ use Illuminate\View\View;
 
 class ContractorController extends Controller
 {
+    use ResolvesListingFilters;
+
     public function index(Request $request): View
     {
         $search = $request->string('search')->toString();
+        $specialite = $request->string('specialite')->toString();
+        $perPage = $this->listingPerPage($request);
+
+        $specialites = Contractor::query()
+            ->select('specialite')
+            ->whereNotNull('specialite')
+            ->distinct()
+            ->orderBy('specialite')
+            ->pluck('specialite');
 
         $contractors = Contractor::query()
             ->withCount('projectPhases')
@@ -25,11 +37,18 @@ class ContractorController extends Controller
                         ->orWhere('email', 'like', "%{$search}%");
                 });
             })
+            ->when($specialites->contains($specialite), fn ($query) => $query->where('specialite', $specialite))
             ->orderBy('nom')
-            ->paginate(15)
+            ->paginate($perPage)
             ->withQueryString();
 
-        return view('back.contractors.index', compact('contractors', 'search'));
+        return view('back.contractors.index', [
+            'contractors' => $contractors,
+            'search' => $search,
+            'specialites' => $specialites,
+            'currentSpecialite' => $specialite,
+            'perPage' => $perPage,
+        ]);
     }
 
     public function create(): View

@@ -13,6 +13,10 @@
             default => 'bg-gray-100 text-gray-600 dark:bg-white/5 dark:text-gray-300',
         };
         $inputClass = 'rounded-lg border-gray-300 bg-white text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90';
+        $hasFilters = $search !== '' || $currentStatus !== '' || $currentType !== '' || $currentSeverity !== ''
+            || $currentPriority !== '' || $currentZone !== null || $currentAssignee !== null
+            || $currentInfrastructure !== null || $currentUnassigned || $currentOpen || $currentSimilar
+            || $from !== null || $to !== null;
     @endphp
 
     <x-back.page-header title="Incidents" desc="Traitement des incidents réseau signalés par les citoyens ou créés en interne.">
@@ -43,10 +47,28 @@
                 <option value="{{ $key }}" @selected($currentSeverity === $key)>{{ $label }}</option>
             @endforeach
         </select>
+        <select name="priority" class="{{ $inputClass }}">
+            <option value="">Toutes les priorités</option>
+            @foreach ($priorities as $key => $label)
+                <option value="{{ $key }}" @selected($currentPriority === $key)>{{ $label }}</option>
+            @endforeach
+        </select>
         <select name="zone_id" class="{{ $inputClass }}">
             <option value="">Toutes les zones</option>
             @foreach ($zones as $zone)
                 <option value="{{ $zone->id }}" @selected($currentZone === $zone->id)>{{ $zone->nom }}</option>
+            @endforeach
+        </select>
+        <select name="infrastructure_id" class="{{ $inputClass }}">
+            <option value="">Toutes les infrastructures</option>
+            @foreach ($infrastructures as $infrastructure)
+                <option value="{{ $infrastructure->id }}" @selected($currentInfrastructure === $infrastructure->id)>{{ $infrastructure->nom }}</option>
+            @endforeach
+        </select>
+        <select name="assigned_to" class="{{ $inputClass }}">
+            <option value="">Tous les responsables</option>
+            @foreach ($gestionnaires as $gestionnaire)
+                <option value="{{ $gestionnaire->id }}" @selected($currentAssignee === $gestionnaire->id)>{{ $gestionnaire->name }}</option>
             @endforeach
         </select>
         <select name="unassigned" class="{{ $inputClass }}">
@@ -63,10 +85,18 @@
             <input type="hidden" name="open" value="1">
             <span class="inline-flex items-center gap-2 rounded-lg bg-brand-50 px-3 py-2 text-xs font-medium text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
                 Incidents ouverts uniquement
-                <a href="{{ route('back.incidents.index', request()->except('open')) }}" class="font-semibold hover:underline">Retirer</a>
+                <a href="{{ route('back.incidents.index', request()->except(['open', 'page'])) }}" class="font-semibold hover:underline">Retirer</a>
             </span>
         @endif
+        <input type="date" name="from" value="{{ $from }}" aria-label="Signalés à partir du" title="Signalés à partir du" class="{{ $inputClass }}">
+        <input type="date" name="to" value="{{ $to }}" aria-label="Signalés jusqu'au" title="Signalés jusqu'au" class="{{ $inputClass }}">
+        <input type="hidden" name="per_page" value="{{ $perPage }}">
         <button type="submit" class="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">Filtrer</button>
+        @if ($hasFilters)
+            <a href="{{ route('back.incidents.index') }}" class="inline-flex items-center justify-center rounded-lg px-3 py-2.5 text-sm font-medium text-gray-500 transition hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                Réinitialiser
+            </a>
+        @endif
     </form>
 
     <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
@@ -122,10 +152,13 @@
                     </tbody>
                 </table>
             </div>
-            <div class="border-t border-gray-100 px-5 py-4 dark:border-gray-800">{{ $incidents->links() }}</div>
+            <x-back.pagination :paginator="$incidents" label="incidents" />
         @else
             <div class="p-5">
-                <x-back.empty-state title="Aucun incident" message="Les incidents signalés apparaîtront ici." />
+                <x-back.empty-state
+                    title="Aucun incident"
+                    message="{{ $hasFilters ? 'Aucun incident ne correspond aux filtres appliqués.' : 'Les incidents signalés apparaîtront ici.' }}"
+                />
             </div>
         @endif
     </div>

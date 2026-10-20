@@ -10,11 +10,13 @@
             'avertissement' => 'bg-warning-50 text-warning-600 dark:bg-warning-500/15 dark:text-warning-400',
             default => 'bg-blue-light-50 text-blue-light-600 dark:bg-blue-light-500/15 dark:text-blue-light-400',
         };
+        $hasFilters = $search !== '' || $currentStatut !== '' || $currentNiveau !== '' || $currentZone !== null || $from !== null || $to !== null;
     @endphp
 
     <x-back.page-header title="Alertes qualité" desc="Alertes générées automatiquement lors de l'analyse des prélèvements non conformes." />
 
     <form method="GET" class="mb-5 flex flex-wrap gap-2">
+        <input type="search" name="search" value="{{ $search }}" placeholder="Message de l'alerte…" class="w-full max-w-xs {{ $inputClass }}">
         <select name="niveau" class="{{ $inputClass }}">
             <option value="">Tous les niveaux</option>
             @foreach ($niveaux as $key => $label)
@@ -33,7 +35,13 @@
                 <option value="{{ $zone->id }}" @selected($currentZone === $zone->id)>{{ $zone->nom }}</option>
             @endforeach
         </select>
+        <input type="date" name="from" value="{{ $from }}" aria-label="Créée du" class="{{ $inputClass }}">
+        <input type="date" name="to" value="{{ $to }}" aria-label="Créée au" class="{{ $inputClass }}">
+        <input type="hidden" name="per_page" value="{{ $perPage }}">
         <button type="submit" class="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">Filtrer</button>
+        @if ($hasFilters)
+            <a href="{{ route('back.quality-alerts.index') }}" class="inline-flex items-center px-2 text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300">Réinitialiser</a>
+        @endif
     </form>
 
     <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
@@ -76,10 +84,10 @@
                     </div>
                 @endforeach
             </div>
-            <div class="border-t border-gray-100 px-5 py-4 dark:border-gray-800">{{ $alerts->links() }}</div>
+            <x-back.pagination :paginator="$alerts" label="alertes" />
         @else
             <div class="p-5">
-                <x-back.empty-state title="Aucune alerte qualité" message="Les alertes apparaissent ici lorsqu'un prélèvement dépasse un seuil configuré." />
+                <x-back.empty-state title="Aucune alerte qualité" :message="$hasFilters ? 'Aucune alerte ne correspond aux filtres sélectionnés.' : 'Les alertes apparaissent ici lorsqu\'un prélèvement dépasse un seuil configuré.'" />
             </div>
         @endif
     </div>

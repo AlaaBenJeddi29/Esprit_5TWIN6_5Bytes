@@ -5,18 +5,37 @@
 @section('content')
     @php
         $inputClass = 'rounded-lg border-gray-300 bg-white text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90';
+        $hasFilters = $search !== '' || $currentType !== '' || $currentActif !== '' || $currentZone !== null;
     @endphp
 
     <x-back.page-header title="Abonnements aux alertes" desc="Consulter les citoyens abonnés aux alertes par zone. Les abonnements sont gérés par les citoyens eux-mêmes." />
 
     <form method="GET" class="mb-5 flex flex-wrap gap-2">
+        <input type="search" name="search" value="{{ $search }}" placeholder="Nom ou email du citoyen…" class="w-full max-w-xs {{ $inputClass }}">
+        <select name="type_alerte" class="{{ $inputClass }}">
+            <option value="">Tous les types</option>
+            @foreach ($types as $key => $label)
+                <option value="{{ $key }}" @selected($currentType === $key)>{{ $label }}</option>
+            @endforeach
+        </select>
+        <select name="actif" class="{{ $inputClass }}">
+            <option value="">Tous les états</option>
+            <option value="1" @selected($currentActif === '1')>Actifs</option>
+            <option value="0" @selected($currentActif === '0')>Inactifs</option>
+        </select>
         <select name="zone_id" class="{{ $inputClass }}">
             <option value="">Toutes les zones</option>
             @foreach ($zones as $zone)
                 <option value="{{ $zone->id }}" @selected($currentZone === $zone->id)>{{ $zone->nom }}</option>
             @endforeach
         </select>
+        <input type="hidden" name="per_page" value="{{ $perPage }}">
         <button type="submit" class="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">Filtrer</button>
+        @if ($hasFilters)
+            <a href="{{ route('back.alert-subscriptions.index') }}" class="inline-flex items-center justify-center rounded-lg px-3 py-2.5 text-sm font-medium text-gray-500 transition hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                Réinitialiser
+            </a>
+        @endif
     </form>
 
     <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
@@ -52,10 +71,13 @@
                     </tbody>
                 </table>
             </div>
-            <div class="border-t border-gray-100 px-5 py-4 dark:border-gray-800">{{ $subscriptions->links() }}</div>
+            <x-back.pagination :paginator="$subscriptions" label="abonnements" />
         @else
             <div class="p-5">
-                <x-back.empty-state title="Aucun abonnement" message="Les citoyens peuvent s'abonner aux alertes depuis leur espace." />
+                <x-back.empty-state
+                    title="Aucun abonnement"
+                    message="{{ $hasFilters ? 'Aucun abonnement ne correspond aux filtres appliqués.' : 'Les citoyens peuvent s’abonner aux alertes depuis leur espace.' }}"
+                />
             </div>
         @endif
     </div>

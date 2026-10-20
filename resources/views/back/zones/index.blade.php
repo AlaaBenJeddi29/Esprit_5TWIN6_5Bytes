@@ -3,6 +3,9 @@
 @section('title', 'AquaSecure — Zones')
 
 @section('content')
+    @php
+        $hasFilters = $search !== '' || $risque !== '' || $tri !== 'nom' || $sens !== 'asc';
+    @endphp
 
     <x-back.page-header title="Zones" desc="Zones géographiques de desserte du réseau d'eau potable.">
         <x-slot:action>
@@ -132,11 +135,15 @@
         @if ($sens !== 'asc')
             <input type="hidden" name="sens" value="{{ $sens }}">
         @endif
+        <input type="hidden" name="per_page" value="{{ $perPage }}">
 
         <button type="submit"
                 class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-theme-xs transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03] dark:hover:text-gray-300">
             Filtrer
         </button>
+        @if ($hasFilters)
+            <a href="{{ route('back.zones.index') }}" class="inline-flex items-center px-2 text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300">Réinitialiser</a>
+        @endif
     </form>
 
     {{-- =====================================================================
@@ -154,6 +161,7 @@
                                 $lienTri = fn (string $col) => route('back.zones.index', array_filter([
                                     'search' => $search ?: null,
                                     'risque' => $risque ?: null,
+                                    'per_page' => $perPage !== 15 ? $perPage : null,
                                     'tri'    => $col,
                                     'sens'   => ($tri === $col && $sens === 'asc') ? 'desc' : 'asc',
                                 ]));
@@ -305,10 +313,10 @@
                 </div>
             </div>
 
-            <div class="border-t border-gray-100 px-5 py-4 dark:border-gray-800">{{ $zones->links() }}</div>
+            <x-back.pagination :paginator="$zones" label="zones" />
         @else
             <div class="p-5">
-                <x-back.empty-state title="Aucune zone" message="Créez une première zone géographique.">
+                <x-back.empty-state title="Aucune zone" :message="$hasFilters ? 'Aucune zone ne correspond aux filtres sélectionnés.' : 'Créez une première zone géographique.'">
                     <x-slot:action>
                         <a href="{{ route('back.zones.create') }}"
                            class="inline-flex items-center justify-center rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white shadow-theme-xs transition hover:bg-brand-600">Créer une zone</a>

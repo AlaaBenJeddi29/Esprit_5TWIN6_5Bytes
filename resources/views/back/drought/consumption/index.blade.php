@@ -5,6 +5,7 @@
 @section('content')
     @php
         $inputClass = 'rounded-lg border-gray-300 bg-white text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90';
+        $hasFilters = $currentZone !== null || $from !== null || $to !== null;
     @endphp
 
     <x-back.page-header title="Consommations mensuelles" desc="Relevés utilisés pour la prévision de la demande et le risque sécheresse.">
@@ -21,7 +22,15 @@
                 <option value="{{ $zone->id }}" @selected($currentZone === $zone->id)>{{ $zone->nom }}</option>
             @endforeach
         </select>
+        <input type="date" name="from" value="{{ $from }}" aria-label="Périodes à partir de" title="Périodes à partir de" class="{{ $inputClass }}">
+        <input type="date" name="to" value="{{ $to }}" aria-label="Périodes jusqu'à" title="Périodes jusqu'à" class="{{ $inputClass }}">
+        <input type="hidden" name="per_page" value="{{ $perPage }}">
         <button type="submit" class="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">Filtrer</button>
+        @if ($hasFilters)
+            <a href="{{ route('back.consumption-readings.index') }}" class="inline-flex items-center justify-center rounded-lg px-3 py-2.5 text-sm font-medium text-gray-500 transition hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                Réinitialiser
+            </a>
+        @endif
         <a href="{{ route('back.consumption-readings.export', array_merge(request()->only(['zone_id']), ['format' => 'pdf'])) }}" class="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">📄 Exporter PDF</a>
         <a href="{{ route('back.consumption-readings.export', array_merge(request()->only(['zone_id']), ['format' => 'excel'])) }}" class="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">📊 Exporter Excel</a>
     </form>
@@ -61,10 +70,13 @@
                     </tbody>
                 </table>
             </div>
-            <div class="border-t border-gray-100 px-5 py-4 dark:border-gray-800">{{ $readings->links() }}</div>
+            <x-back.pagination :paginator="$readings" label="relevés" />
         @else
             <div class="p-5">
-                <x-back.empty-state title="Aucun relevé de consommation" message="Ajoutez au moins deux relevés par zone pour activer les prévisions." />
+                <x-back.empty-state
+                    title="Aucun relevé de consommation"
+                    message="{{ $hasFilters ? 'Aucun relevé ne correspond aux filtres appliqués.' : 'Ajoutez au moins deux relevés par zone pour activer les prévisions.' }}"
+                />
             </div>
         @endif
     </div>

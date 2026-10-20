@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Back;
 
+use App\Http\Controllers\Concerns\ResolvesListingFilters;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Quality\UpdateQualityAlertRequest;
 use App\Models\Infrastructure\Zone;
@@ -12,19 +13,27 @@ use Illuminate\View\View;
 
 class QualityAlertController extends Controller
 {
+    use ResolvesListingFilters;
+
     public function index(Request $request): View
     {
         $statut = $request->string('statut')->toString();
         $niveau = $request->string('niveau')->toString();
         $zoneId = $request->integer('zone_id');
+        $search = $request->string('search')->toString();
+        $dates = $this->listingDateRange($request);
+        $perPage = $this->listingPerPage($request);
 
         $alerts = WaterQualityAlert::query()
             ->with(['zone', 'sample'])
+            ->when($search !== '', fn ($query) => $query->where('message', 'like', "%{$search}%"))
             ->when(array_key_exists($statut, WaterQualityAlert::STATUTS), fn ($query) => $query->where('statut', $statut))
             ->when(array_key_exists($niveau, WaterQualityAlert::NIVEAUX), fn ($query) => $query->where('niveau', $niveau))
             ->when($zoneId, fn ($query) => $query->where('zone_id', $zoneId))
+            ->when($dates['from'], fn ($query) => $query->whereDate('created_at', '>=', $dates['from']))
+            ->when($dates['to'], fn ($query) => $query->whereDate('created_at', '<=', $dates['to']))
             ->latest()
-            ->paginate(20)
+            ->paginate($perPage)
             ->withQueryString();
 
         return view('back.quality.alerts.index', [
@@ -32,9 +41,13 @@ class QualityAlertController extends Controller
             'statuts' => WaterQualityAlert::STATUTS,
             'niveaux' => WaterQualityAlert::NIVEAUX,
             'zones' => Zone::orderBy('nom')->get(),
+            'search' => $search,
             'currentStatut' => $statut,
             'currentNiveau' => $niveau,
             'currentZone' => $zoneId ?: null,
+            'from' => $dates['from'],
+            'to' => $dates['to'],
+            'perPage' => $perPage,
         ]);
     }
 

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Front;
 
+use App\Http\Controllers\Concerns\ResolvesListingFilters;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\ProjectAssistantRequest;
 use App\Http\Requests\StoreDonationRequest;
@@ -23,27 +24,34 @@ use Throwable;
 
 class ProjectController extends Controller
 {
+    use ResolvesListingFilters;
+
     public function __construct(private readonly ProjectAssistant $assistant) {}
 
     public function index(Request $request): View
     {
         $zoneId = $request->integer('zone_id');
         $statut = $request->string('statut')->toString();
+        $search = $request->string('search')->toString();
+        $perPage = $this->listingPerPage($request);
 
         $projects = Project::query()
             ->with(['zone', 'responsable'])
+            ->when($search !== '', fn ($query) => $query->where('titre', 'like', "%{$search}%"))
             ->when($zoneId, fn ($query) => $query->where('zone_id', $zoneId))
             ->when(in_array($statut, Project::STATUTS, true), fn ($query) => $query->where('statut', $statut))
             ->latest()
-            ->paginate(12)
+            ->paginate($perPage)
             ->withQueryString();
 
         return view('front.projects.index', [
             'projects' => $projects,
             'zones' => Zone::orderBy('nom')->get(),
             'statuts' => Project::STATUTS,
+            'search' => $search,
             'currentZone' => $zoneId ?: null,
             'currentStatut' => $statut,
+            'perPage' => $perPage,
         ]);
     }
 

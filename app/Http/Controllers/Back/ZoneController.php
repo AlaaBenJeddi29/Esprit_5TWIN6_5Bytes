@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Back;
 
+use App\Http\Controllers\Concerns\ResolvesListingFilters;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Infrastructure\StoreZoneRequest;
 use App\Http\Requests\Infrastructure\UpdateZoneRequest;
@@ -20,6 +21,8 @@ use Illuminate\View\View;
 
 class ZoneController extends Controller
 {
+    use ResolvesListingFilters;
+
     /**
      * Colonnes autorisées pour le tri (liste blanche contre injection SQL).
      *
@@ -58,6 +61,7 @@ class ZoneController extends Controller
         $risque  = $request->string('risque')->toString();   // faible | modere | eleve | critique
         $tri     = self::COLONNES_TRI[$request->string('tri')->toString()] ?? 'nom';
         $sens    = $request->string('sens')->toString() === 'desc' ? 'desc' : 'asc';
+        $perPage = $this->listingPerPage($request);
 
         // --- Requête principale (agrégats via sous-requêtes corrélées, zéro N+1) ---
         // Pas de jointure ni de GROUP BY : compatible MySQL ET MariaDB (XAMPP),
@@ -96,7 +100,7 @@ class ZoneController extends Controller
                 fn ($q) => $q->orderByRaw(self::expressionTri($tri, $sens)),
                 fn ($q) => $q->orderBy("zones.{$tri}", $sens),
             )
-            ->paginate(10)
+            ->paginate($perPage)
             ->withQueryString();
 
         // --- Bloc "Zones prioritaires" : top 3 toutes zones confondues (hors pagination) ---
@@ -153,6 +157,7 @@ class ZoneController extends Controller
             'risque',
             'tri',
             'sens',
+            'perPage',
             'zonesPrioritaires',
             'previsionParZone',
         ));
@@ -265,9 +270,14 @@ class ZoneController extends Controller
             ->with('success', "La zone « {$zone->nom} » a été créée.");
     }
 
-    public function show(Zone $zone): View
+    public function show(Request $request, Zone $zone): View
     {
-        $zone->load(['infrastructures' => fn ($query) => $query->orderBy('nom')]);
+        $zone->loadCount('infrastructures');
+
+        $infrastructures = $zone->infrastructures()
+            ->orderBy('nom')
+            ->paginate($this->listingPerPage($request), ['*'], 'infra_page')
+            ->withQueryString();
 
         // --- Historique des coûts de maintenance des 6 derniers mois pour cette zone ---
         $depuisMois = now()->subMonths(self::MOIS_HISTORIQUE)->startOfMonth()->toDateString();
@@ -302,7 +312,7 @@ class ZoneController extends Controller
                 : null;
         }
 
-        return view('back.zones.show', compact('zone', 'historiqueBrut', 'prevision', 'moisPrevus'));
+        return view('back.zones.show', compact('zone', 'infrastructures', 'historiqueBrut', 'prevision', 'moisPrevus'));
     }
 
     public function edit(Zone $zone): View

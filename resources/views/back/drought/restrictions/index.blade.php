@@ -10,6 +10,8 @@
             'planifiee' => 'bg-warning-50 text-warning-600 dark:bg-warning-500/15 dark:text-warning-400',
             default => 'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-300',
         };
+        $hasFilters = $search !== '' || $currentType !== '' || $currentStatut !== '' || $currentZone !== null
+            || $from !== null || $to !== null;
     @endphp
 
     <x-back.page-header title="Restrictions d'usage" desc="Mesures de limitation de l'eau potable, publiées sur le site citoyen.">
@@ -19,6 +21,7 @@
     </x-back.page-header>
 
     <form method="GET" class="mb-5 flex flex-wrap gap-2">
+        <input type="search" name="search" value="{{ $search }}" placeholder="Titre de la restriction…" class="w-full max-w-xs {{ $inputClass }}">
         <select name="type" class="{{ $inputClass }}">
             <option value="">Tous les niveaux</option>
             @foreach ($types as $key => $label)
@@ -37,7 +40,15 @@
                 <option value="{{ $zone->id }}" @selected($currentZone === $zone->id)>{{ $zone->nom }}</option>
             @endforeach
         </select>
+        <input type="date" name="from" value="{{ $from }}" aria-label="Débuts à partir du" title="Débuts à partir du" class="{{ $inputClass }}">
+        <input type="date" name="to" value="{{ $to }}" aria-label="Débuts jusqu'au" title="Débuts jusqu'au" class="{{ $inputClass }}">
+        <input type="hidden" name="per_page" value="{{ $perPage }}">
         <button type="submit" class="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">Filtrer</button>
+        @if ($hasFilters)
+            <a href="{{ route('back.restrictions.index') }}" class="inline-flex items-center justify-center rounded-lg px-3 py-2.5 text-sm font-medium text-gray-500 transition hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                Réinitialiser
+            </a>
+        @endif
         <a href="{{ route('back.restrictions.export', array_merge(request()->only(['zone_id', 'type', 'statut']), ['format' => 'pdf'])) }}" class="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">📄 Exporter PDF</a>
         <a href="{{ route('back.restrictions.export', array_merge(request()->only(['zone_id', 'type', 'statut']), ['format' => 'excel'])) }}" class="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">📊 Exporter Excel</a>
     </form>
@@ -82,10 +93,13 @@
                     </tbody>
                 </table>
             </div>
-            <div class="border-t border-gray-100 px-5 py-4 dark:border-gray-800">{{ $restrictions->links() }}</div>
+            <x-back.pagination :paginator="$restrictions" label="restrictions" />
         @else
             <div class="p-5">
-                <x-back.empty-state title="Aucune restriction" message="Les restrictions actives sont visibles publiquement." />
+                <x-back.empty-state
+                    title="Aucune restriction"
+                    message="{{ $hasFilters ? 'Aucune restriction ne correspond aux filtres appliqués.' : 'Les restrictions actives sont visibles publiquement.' }}"
+                />
             </div>
         @endif
     </div>

@@ -11,6 +11,8 @@
             'terminee' => 'bg-success-50 text-success-600 dark:bg-success-500/15 dark:text-success-400',
             default => 'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-300',
         };
+        $hasFilters = $search !== '' || $currentStatut !== '' || $currentZone !== null
+            || $currentInfrastructure !== null || $from !== null || $to !== null;
     @endphp
 
     <x-back.page-header title="Coupures programmées" desc="Interruptions planifiées du service, visibles par les citoyens.">
@@ -20,6 +22,7 @@
     </x-back.page-header>
 
     <form method="GET" class="mb-5 flex flex-wrap gap-2">
+        <input type="search" name="search" value="{{ $search }}" placeholder="Motif de la coupure…" class="w-full max-w-xs {{ $inputClass }}">
         <select name="statut" class="{{ $inputClass }}">
             <option value="">Tous les statuts</option>
             @foreach ($statuts as $key => $label)
@@ -32,7 +35,21 @@
                 <option value="{{ $zone->id }}" @selected($currentZone === $zone->id)>{{ $zone->nom }}</option>
             @endforeach
         </select>
+        <select name="infrastructure_id" class="{{ $inputClass }}">
+            <option value="">Toutes les infrastructures</option>
+            @foreach ($infrastructures as $infrastructure)
+                <option value="{{ $infrastructure->id }}" @selected($currentInfrastructure === $infrastructure->id)>{{ $infrastructure->nom }}</option>
+            @endforeach
+        </select>
+        <input type="date" name="from" value="{{ $from }}" aria-label="Débuts à partir du" title="Débuts à partir du" class="{{ $inputClass }}">
+        <input type="date" name="to" value="{{ $to }}" aria-label="Débuts jusqu'au" title="Débuts jusqu'au" class="{{ $inputClass }}">
+        <input type="hidden" name="per_page" value="{{ $perPage }}">
         <button type="submit" class="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">Filtrer</button>
+        @if ($hasFilters)
+            <a href="{{ route('back.scheduled-cuts.index') }}" class="inline-flex items-center justify-center rounded-lg px-3 py-2.5 text-sm font-medium text-gray-500 transition hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                Réinitialiser
+            </a>
+        @endif
         <a href="{{ route('back.scheduled-cuts.export', array_merge(request()->only(['zone_id', 'statut']), ['format' => 'pdf'])) }}" class="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">📄 Exporter PDF</a>
         <a href="{{ route('back.scheduled-cuts.export', array_merge(request()->only(['zone_id', 'statut']), ['format' => 'excel'])) }}" class="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">📊 Exporter Excel</a>
     </form>
@@ -74,10 +91,13 @@
                     </tbody>
                 </table>
             </div>
-            <div class="border-t border-gray-100 px-5 py-4 dark:border-gray-800">{{ $cuts->links() }}</div>
+            <x-back.pagination :paginator="$cuts" label="coupures" />
         @else
             <div class="p-5">
-                <x-back.empty-state title="Aucune coupure programmée" message="Les coupures planifiées apparaissent dans l'espace citoyen." />
+                <x-back.empty-state
+                    title="Aucune coupure programmée"
+                    message="{{ $hasFilters ? 'Aucune coupure ne correspond aux filtres appliqués.' : 'Les coupures planifiées apparaissent dans l’espace citoyen.' }}"
+                />
             </div>
         @endif
     </div>

@@ -52,6 +52,20 @@
                 <div class="rounded-md bg-white p-6 shadow-1 dark:bg-dark-2 lg:col-span-2">
                     <h2 class="mb-4 text-lg font-bold text-dark dark:text-white">Zones suivies</h2>
 
+                    <form method="GET" class="mb-4 flex flex-wrap items-center gap-2">
+                        <select name="type_alerte" class="rounded-md border border-stroke bg-white px-3 py-2 text-sm text-dark outline-none focus:border-primary dark:border-dark-3 dark:bg-dark-2 dark:text-white">
+                            <option value="">Tous les types</option>
+                            @foreach ($types as $key => $label)
+                                <option value="{{ $key }}" @selected($currentType === $key)>{{ $label }}</option>
+                            @endforeach
+                        </select>
+                        <input type="hidden" name="per_page" value="{{ $perPage }}">
+                        <button type="submit" class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-blue-dark">Filtrer</button>
+                        @if ($currentType !== '')
+                            <a href="{{ route('citizen.subscriptions.index') }}" class="text-sm text-body-color hover:text-primary dark:text-dark-6">Réinitialiser</a>
+                        @endif
+                    </form>
+
                     @forelse ($subscriptions as $subscription)
                         <div class="flex flex-wrap items-center justify-between gap-3 border-b border-stroke py-3 last:border-0 dark:border-dark-3">
                             <div>
@@ -67,9 +81,13 @@
                         </div>
                     @empty
                         <p class="text-sm text-body-color dark:text-dark-6">
-                            Vous n'êtes abonné à aucune zone. Utilisez le formulaire pour suivre les alertes de votre secteur.
+                            {{ $currentType !== '' ? 'Aucun abonnement ne correspond à ce type d\'alerte.' : 'Vous n\'êtes abonné à aucune zone. Utilisez le formulaire pour suivre les alertes de votre secteur.' }}
                         </p>
                     @endforelse
+
+                    @if ($subscriptions->isNotEmpty())
+                        <x-front.pagination :paginator="$subscriptions" label="abonnements" class="!border-0 !p-0" />
+                    @endif
                 </div>
             </div>
         </div>

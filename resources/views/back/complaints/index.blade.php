@@ -55,6 +55,7 @@
             <option value="1" @selected(! empty($filters['reopen']))>Réouverture demandée</option>
         </select>
 
+        <input type="hidden" name="per_page" value="{{ $perPage }}">
         <button type="submit" class="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">Filtrer</button>
         <a href="{{ route('back.complaints.index') }}" class="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">Réinitialiser</a>
     </form>
@@ -114,7 +115,7 @@
                     </tbody>
                 </table>
             </div>
-            <div class="border-t border-gray-100 px-5 py-4 dark:border-gray-800">{{ $feedbacks->links() }}</div>
+            <x-back.pagination :paginator="$feedbacks" label="réclamations" />
         @else
             <div class="p-5">
                 <x-back.empty-state title="Aucune réclamation" message="Les réclamations déposées par les citoyens apparaîtront ici." />

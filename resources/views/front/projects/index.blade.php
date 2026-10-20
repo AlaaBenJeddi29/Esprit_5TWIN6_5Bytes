@@ -16,6 +16,7 @@
             @endphp
 
             <form method="GET" class="mb-8 flex flex-wrap gap-3">
+                <input type="search" name="search" value="{{ $search }}" placeholder="Titre du projet…" class="{{ $inputClass }} max-w-xs">
                 <select name="zone_id" class="{{ $inputClass }} max-w-xs">
                     <option value="">Toutes les zones</option>
                     @foreach ($zones as $zone)
@@ -28,6 +29,7 @@
                         <option value="{{ $statut }}" @selected($currentStatut === $statut)>{{ ucfirst(str_replace('_', ' ', $statut)) }}</option>
                     @endforeach
                 </select>
+                <input type="hidden" name="per_page" value="{{ $perPage }}">
                 <button type="submit" class="rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-white hover:bg-blue-dark">Filtrer</button>
                 <a href="{{ route('public.projects.index') }}" class="rounded-md border border-stroke px-5 py-2.5 text-sm text-body-color hover:border-primary hover:text-primary dark:border-dark-3 dark:text-dark-6">Réinitialiser</a>
             </form>
@@ -88,8 +90,8 @@
                 @endforelse
             </div>
 
-            @if ($projects->hasPages())
-                <div class="mt-8">{{ $projects->links() }}</div>
+            @if ($projects->isNotEmpty())
+                <x-front.pagination :paginator="$projects" label="projets" class="mt-8 !border-0 !px-0" />
             @endif
         </div>
     </section>

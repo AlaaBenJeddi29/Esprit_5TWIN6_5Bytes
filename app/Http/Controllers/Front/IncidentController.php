@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Front;
 
+use App\Http\Controllers\Concerns\ResolvesListingFilters;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Incident\StoreIncidentCommentRequest;
 use App\Http\Requests\Incident\StoreIncidentPhotoRequest;
@@ -21,6 +22,8 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class IncidentController extends Controller
 {
+    use ResolvesListingFilters;
+
     public function __construct(
         private readonly IncidentClassifier $classifier,
         private readonly DuplicateDetector $duplicateDetector,
@@ -28,13 +31,35 @@ class IncidentController extends Controller
 
     public function index(Request $request): View
     {
+        $search = $request->string('search')->toString();
+        $statut = $request->string('statut')->toString();
+        $type = $request->string('type')->toString();
+        $perPage = $this->listingPerPage($request, 10);
+
         $incidents = Incident::query()
             ->where('user_id', $request->user()->id)
+            ->when($search !== '', function ($query) use ($search) {
+                $query->where(function ($query) use ($search) {
+                    $query->where('reference', 'like', "%{$search}%")
+                        ->orWhere('title', 'like', "%{$search}%");
+                });
+            })
+            ->when(array_key_exists($statut, Incident::STATUSES), fn ($query) => $query->where('status', $statut))
+            ->when(array_key_exists($type, Incident::TYPES), fn ($query) => $query->where('type', $type))
             ->with('zone')
             ->latest('reported_at')
-            ->paginate(10);
+            ->paginate($perPage)
+            ->withQueryString();
 
-        return view('front.incidents.index', compact('incidents'));
+        return view('front.incidents.index', [
+            'incidents' => $incidents,
+            'statuses' => Incident::STATUSES,
+            'types' => Incident::TYPES,
+            'search' => $search,
+            'currentStatut' => $statut,
+            'currentType' => $type,
+            'perPage' => $perPage,
+        ]);
     }
 
     public function create(): View

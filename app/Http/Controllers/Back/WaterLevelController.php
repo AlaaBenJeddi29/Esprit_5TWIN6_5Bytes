@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Back;
 
 use App\Exports\Drought\WaterLevelExport;
+use App\Http\Controllers\Concerns\ResolvesListingFilters;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Drought\StoreWaterLevelRequest;
 use App\Http\Requests\Drought\UpdateWaterLevelRequest;
@@ -18,25 +19,37 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class WaterLevelController extends Controller
 {
+    use ResolvesListingFilters;
+
     public function index(Request $request): View
     {
+        $search = $request->string('search')->toString();
         $zoneId = $request->integer('zone_id');
         $type = $request->string('type_source')->toString();
+        ['from' => $from, 'to' => $to] = $this->listingDateRange($request);
+        $perPage = $this->listingPerPage($request);
 
         $levels = WaterLevel::query()
             ->with('zone')
+            ->when($search !== '', fn ($query) => $query->where('nom_source', 'like', "%{$search}%"))
             ->when($zoneId, fn ($query) => $query->where('zone_id', $zoneId))
             ->when(array_key_exists($type, WaterLevel::TYPES), fn ($query) => $query->where('type_source', $type))
+            ->when($from !== null, fn ($query) => $query->whereDate('date_mesure', '>=', $from))
+            ->when($to !== null, fn ($query) => $query->whereDate('date_mesure', '<=', $to))
             ->latest('date_mesure')
-            ->paginate(20)
+            ->paginate($perPage)
             ->withQueryString();
 
         return view('back.drought.levels.index', [
             'levels' => $levels,
             'zones' => Zone::orderBy('nom')->get(),
             'types' => WaterLevel::TYPES,
+            'search' => $search,
             'currentZone' => $zoneId ?: null,
             'currentType' => $type,
+            'from' => $from,
+            'to' => $to,
+            'perPage' => $perPage,
         ]);
     }
 

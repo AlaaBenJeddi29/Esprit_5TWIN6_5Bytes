@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Front;
 
+use App\Http\Controllers\Concerns\ResolvesListingFilters;
 use App\Http\Controllers\Controller;
 use App\Models\Infrastructure\Infrastructure;
 use App\Models\Infrastructure\Zone;
@@ -10,21 +11,27 @@ use Illuminate\View\View;
 
 class PublicInfrastructureController extends Controller
 {
+    use ResolvesListingFilters;
+
     public function index(Request $request): View
     {
         $zoneId = $request->integer('zone_id');
         $type = $request->string('type')->toString();
         $statut = $request->string('statut')->toString();
+        $search = $request->string('search')->toString();
+        $perPage = $this->listingPerPage($request);
 
-        $infrastructures = Infrastructure::query()
-            ->with('zone')
+        $query = Infrastructure::query()
+            ->when($search !== '', fn ($query) => $query->where('nom', 'like', "%{$search}%"))
             ->when($zoneId, fn ($query) => $query->where('zone_id', $zoneId))
             ->when(array_key_exists($type, array_flip(Infrastructure::TYPES)), fn ($query) => $query->where('type', $type))
-            ->when(array_key_exists($statut, array_flip(Infrastructure::STATUTS)), fn ($query) => $query->where('statut', $statut))
-            ->orderBy('nom')
-            ->get();
+            ->when(array_key_exists($statut, array_flip(Infrastructure::STATUTS)), fn ($query) => $query->where('statut', $statut));
 
-        $mapPoints = $infrastructures
+        // La carte doit conserver tous les points filtrés, indépendamment de la page affichée.
+        $mapPoints = (clone $query)
+            ->with('zone')
+            ->orderBy('nom')
+            ->get()
             ->filter(fn (Infrastructure $infrastructure) => $infrastructure->latitude && $infrastructure->longitude)
             ->map(fn (Infrastructure $infrastructure) => [
                 'nom' => $infrastructure->nom,
@@ -37,15 +44,23 @@ class PublicInfrastructureController extends Controller
             ])
             ->values();
 
+        $infrastructures = $query
+            ->with('zone')
+            ->orderBy('nom')
+            ->paginate($perPage)
+            ->withQueryString();
+
         return view('front.infrastructures.index', [
             'infrastructures' => $infrastructures,
             'mapPoints' => $mapPoints,
             'zones' => Zone::orderBy('nom')->get(),
             'types' => Infrastructure::TYPES,
             'statuts' => Infrastructure::STATUTS,
+            'search' => $search,
             'currentZone' => $zoneId ?: null,
             'currentType' => $type,
             'currentStatut' => $statut,
+            'perPage' => $perPage,
         ]);
     }
 

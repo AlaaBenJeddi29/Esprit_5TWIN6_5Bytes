@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Back;
 
 use App\Enums\UserRole;
+use App\Http\Controllers\Concerns\ResolvesListingFilters;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Quality\UpdateQualityZoneAssignmentsRequest;
 use App\Models\Infrastructure\Zone;
@@ -15,16 +16,27 @@ use Illuminate\View\View;
 
 class QualityZoneAssignmentController extends Controller
 {
+    use ResolvesListingFilters;
+
     public function index(Request $request): View
     {
         abort_unless($request->user()?->isAdmin(), 403);
 
+        $search = $request->string('search')->toString();
+        $perPage = $this->listingPerPage($request);
+
         $gestionnaires = User::query()
             ->where('role', UserRole::Gestionnaire->value)
+            ->when($search !== '', fn ($query) => $query->where(function ($query) use ($search) {
+                $query->where('name', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%");
+            }))
             ->orderBy('name')
-            ->get();
+            ->paginate($perPage)
+            ->withQueryString();
 
         $assignments = QualityZoneAssignment::query()
+            ->whereIn('user_id', $gestionnaires->getCollection()->modelKeys())
             ->get()
             ->groupBy('user_id')
             ->map(fn ($rows) => $rows->pluck('zone_id')->map(fn ($id) => (int) $id)->all());
@@ -33,6 +45,8 @@ class QualityZoneAssignmentController extends Controller
             'gestionnaires' => $gestionnaires,
             'zones' => Zone::query()->orderBy('nom')->get(),
             'assignments' => $assignments,
+            'search' => $search,
+            'perPage' => $perPage,
         ]);
     }
 

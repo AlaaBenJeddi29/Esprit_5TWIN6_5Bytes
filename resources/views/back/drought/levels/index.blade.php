@@ -10,6 +10,7 @@
             'alerte' => 'bg-warning-50 text-warning-600 dark:bg-warning-500/15 dark:text-warning-400',
             default => 'bg-success-50 text-success-600 dark:bg-success-500/15 dark:text-success-400',
         };
+        $hasFilters = $search !== '' || $currentType !== '' || $currentZone !== null || $from !== null || $to !== null;
     @endphp
 
     <x-back.page-header title="Niveaux des ressources" desc="Mesures de remplissage des barrages, nappes et réservoirs.">
@@ -19,6 +20,7 @@
     </x-back.page-header>
 
     <form method="GET" class="mb-5 flex flex-wrap gap-2">
+        <input type="search" name="search" value="{{ $search }}" placeholder="Nom de la source…" class="w-full max-w-xs {{ $inputClass }}">
         <select name="type_source" class="{{ $inputClass }}">
             <option value="">Tous les types</option>
             @foreach ($types as $key => $label)
@@ -31,7 +33,15 @@
                 <option value="{{ $zone->id }}" @selected($currentZone === $zone->id)>{{ $zone->nom }}</option>
             @endforeach
         </select>
+        <input type="date" name="from" value="{{ $from }}" aria-label="Mesures à partir du" title="Mesures à partir du" class="{{ $inputClass }}">
+        <input type="date" name="to" value="{{ $to }}" aria-label="Mesures jusqu'au" title="Mesures jusqu'au" class="{{ $inputClass }}">
+        <input type="hidden" name="per_page" value="{{ $perPage }}">
         <button type="submit" class="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">Filtrer</button>
+        @if ($hasFilters)
+            <a href="{{ route('back.water-levels.index') }}" class="inline-flex items-center justify-center rounded-lg px-3 py-2.5 text-sm font-medium text-gray-500 transition hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                Réinitialiser
+            </a>
+        @endif
         <a href="{{ route('back.water-levels.export', array_merge(request()->only(['zone_id', 'type_source']), ['format' => 'pdf'])) }}" class="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">📄 Exporter PDF</a>
         <a href="{{ route('back.water-levels.export', array_merge(request()->only(['zone_id', 'type_source']), ['format' => 'excel'])) }}" class="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">📊 Exporter Excel</a>
     </form>
@@ -76,10 +86,13 @@
                     </tbody>
                 </table>
             </div>
-            <div class="border-t border-gray-100 px-5 py-4 dark:border-gray-800">{{ $levels->links() }}</div>
+            <x-back.pagination :paginator="$levels" label="mesures" />
         @else
             <div class="p-5">
-                <x-back.empty-state title="Aucune mesure de niveau" message="Ajoutez des mesures pour alimenter l'analyse du risque sécheresse." />
+                <x-back.empty-state
+                    title="Aucune mesure de niveau"
+                    message="{{ $hasFilters ? 'Aucune mesure ne correspond aux filtres appliqués.' : 'Ajoutez des mesures pour alimenter l’analyse du risque sécheresse.' }}"
+                />
             </div>
         @endif
     </div>

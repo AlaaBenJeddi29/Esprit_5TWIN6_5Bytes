@@ -86,6 +86,17 @@
             <input type="date" id="filter-date" name="date" value="{{ $currentDate }}" class="{{ $inputClass }}">
         </div>
 
+        <div>
+            <label for="filter-frequence" class="mb-1 block text-sm text-gray-500 dark:text-gray-400">Fréquence</label>
+            <select id="filter-frequence" name="frequence" class="{{ $inputClass }}">
+                <option value="">Toutes les fréquences</option>
+                @foreach ($frequences as $value => $label)
+                    <option value="{{ $value }}" @selected($currentFrequence === $value)>{{ $label }}</option>
+                @endforeach
+            </select>
+        </div>
+
+        <input type="hidden" name="per_page" value="{{ $perPage }}">
         <button type="submit" class="inline-flex items-center justify-center rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white shadow-theme-xs transition hover:bg-brand-600">Filtrer</button>
         <a href="{{ route('back.quality-planifications.index') }}" class="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300">Réinitialiser</a>
     </form>
@@ -151,9 +162,7 @@
                 </table>
             </div>
 
-            <div class="border-t border-gray-100 px-5 py-4 dark:border-gray-800">
-                {{ $planifications->links() }}
-            </div>
+            <x-back.pagination :paginator="$planifications" label="contrôles planifiés" />
         @endif
     </div>
 @endsection
