@@ -26,9 +26,51 @@ class PasswordUpdateTest extends TestCase
 
         $response
             ->assertSessionHasNoErrors()
+            ->assertSessionHas('success', 'Votre mot de passe a été mis à jour.')
             ->assertRedirect('/profile');
 
+        $this->assertAuthenticatedAs($user);
         $this->assertTrue(Hash::check('new-password', $user->refresh()->password));
+    }
+
+    public function test_short_password_is_rejected(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this
+            ->actingAs($user)
+            ->from('/profile')
+            ->put('/password', [
+                'current_password' => 'password',
+                'password' => 'court',
+                'password_confirmation' => 'court',
+            ]);
+
+        $response
+            ->assertSessionHasErrorsIn('updatePassword', 'password')
+            ->assertRedirect('/profile');
+
+        $this->assertTrue(Hash::check('password', $user->refresh()->password));
+    }
+
+    public function test_password_confirmation_must_match(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this
+            ->actingAs($user)
+            ->from('/profile')
+            ->put('/password', [
+                'current_password' => 'password',
+                'password' => 'new-password',
+                'password_confirmation' => 'autre-password',
+            ]);
+
+        $response
+            ->assertSessionHasErrorsIn('updatePassword', 'password')
+            ->assertRedirect('/profile');
+
+        $this->assertTrue(Hash::check('password', $user->refresh()->password));
     }
 
     public function test_correct_password_must_be_provided_to_update_password(): void

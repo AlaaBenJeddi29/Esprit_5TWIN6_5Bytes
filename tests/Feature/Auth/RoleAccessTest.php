@@ -59,6 +59,13 @@ class RoleAccessTest extends TestCase
         $this->get('/back/dashboard')->assertRedirect(route('login'));
     }
 
+    public function test_guest_is_redirected_to_login_from_protected_routes(): void
+    {
+        foreach (['/dashboard', '/profile', '/mon-espace'] as $uri) {
+            $this->get($uri)->assertRedirect(route('login'));
+        }
+    }
+
     public function test_citizen_cannot_access_back_office(): void
     {
         $citizen = User::factory()->citoyen()->create();

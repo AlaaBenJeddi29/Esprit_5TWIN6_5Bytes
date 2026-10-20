@@ -8,6 +8,8 @@ use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Auth\PasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\Auth\RegisteredUserController;
+use App\Http\Controllers\Auth\TwoFactorChallengeController;
+use App\Http\Controllers\Auth\TwoFactorSettingsController;
 use App\Http\Controllers\Auth\VerifyEmailController;
 use Illuminate\Support\Facades\Route;
 
@@ -15,7 +17,8 @@ Route::middleware('guest')->group(function () {
     Route::get('register', [RegisteredUserController::class, 'create'])
         ->name('register');
 
-    Route::post('register', [RegisteredUserController::class, 'store']);
+    Route::post('register', [RegisteredUserController::class, 'store'])
+        ->middleware('throttle:6,1');
 
     Route::get('login', [AuthenticatedSessionController::class, 'create'])
         ->name('login');
@@ -26,12 +29,14 @@ Route::middleware('guest')->group(function () {
         ->name('password.request');
 
     Route::post('forgot-password', [PasswordResetLinkController::class, 'store'])
+        ->middleware('throttle:6,1')
         ->name('password.email');
 
     Route::get('reset-password/{token}', [NewPasswordController::class, 'create'])
         ->name('password.reset');
 
     Route::post('reset-password', [NewPasswordController::class, 'store'])
+        ->middleware('throttle:6,1')
         ->name('password.store');
 });
 
@@ -54,6 +59,48 @@ Route::middleware('auth')->group(function () {
 
     Route::put('password', [PasswordController::class, 'update'])->name('password.update');
 
+    Route::get('two-factor', [TwoFactorSettingsController::class, 'show'])
+        ->name('two-factor.show');
+
+    Route::post('two-factor/setup', [TwoFactorSettingsController::class, 'setup'])
+        ->middleware('throttle:10,1')
+        ->name('two-factor.setup');
+
+    Route::get('two-factor/setup', [TwoFactorSettingsController::class, 'showSetup'])
+        ->name('two-factor.setup.show');
+
+    Route::post('two-factor/setup/cancel', [TwoFactorSettingsController::class, 'cancelSetup'])
+        ->name('two-factor.setup.cancel');
+
+    Route::post('two-factor/confirm', [TwoFactorSettingsController::class, 'confirm'])
+        ->middleware('throttle:10,1')
+        ->name('two-factor.confirm');
+
+    Route::post('two-factor/recovery-codes', [TwoFactorSettingsController::class, 'regenerateRecoveryCodes'])
+        ->middleware('throttle:10,1')
+        ->name('two-factor.recovery-codes');
+
+    Route::post('two-factor/disable', [TwoFactorSettingsController::class, 'disable'])
+        ->middleware('throttle:10,1')
+        ->name('two-factor.disable');
+
     Route::post('logout', [AuthenticatedSessionController::class, 'destroy'])
         ->name('logout');
 });
+
+/*
+|--------------------------------------------------------------------------
+| Défi du second facteur (utilisateur non encore authentifié)
+|--------------------------------------------------------------------------
+| L'accès dépend uniquement d'une session en attente créée après validation
+| des identifiants. Aucune session authentifiée n'existe à ce stade.
+*/
+Route::get('two-factor-challenge', [TwoFactorChallengeController::class, 'create'])
+    ->name('two-factor.login');
+
+Route::post('two-factor-challenge', [TwoFactorChallengeController::class, 'store'])
+    ->middleware('throttle:10,1')
+    ->name('two-factor.login.store');
+
+Route::post('two-factor-challenge/cancel', [TwoFactorChallengeController::class, 'destroy'])
+    ->name('two-factor.login.cancel');

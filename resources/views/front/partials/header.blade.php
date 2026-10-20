@@ -96,9 +96,12 @@
                             {{-- Utilisateur connecté : avatar + menu (aucun lien d'administration) --}}
                             <details class="relative">
                                 <summary class="flex cursor-pointer list-none items-center gap-2 rounded-full bg-white/20 py-1 pl-1 pr-3 text-white">
-                                    <span class="flex h-8 w-8 items-center justify-center rounded-full bg-white text-sm font-semibold text-primary">
-                                        {{ mb_strtoupper(mb_substr(auth()->user()->name, 0, 1)) }}
-                                    </span>
+                                    <x-user-avatar
+                                        :user="auth()->user()"
+                                        size="h-8 w-8"
+                                        text-size="text-sm"
+                                        fallback-class="bg-white text-primary"
+                                    />
                                     <span class="max-w-[10rem] truncate text-base font-medium">{{ auth()->user()->name }}</span>
                                 </summary>
                                 <div class="absolute right-0 z-50 mt-2 w-56 rounded-lg bg-white py-2 text-left shadow-lg">

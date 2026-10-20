@@ -24,6 +24,9 @@ class PasswordController extends Controller
             'password' => Hash::make($validated['password']),
         ]);
 
-        return back()->with('status', 'password-updated');
+        // Renouvelle l'identifiant de session après un changement de secret.
+        $request->session()->regenerate();
+
+        return back()->with('success', 'Votre mot de passe a été mis à jour.');
     }
 }
