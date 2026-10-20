@@ -9,8 +9,9 @@ use App\Models\Quality\WaterQualityParameter;
 use App\Models\Quality\WaterQualitySample;
 use App\Models\User;
 use App\Services\QualityAnalyzer;
-use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
@@ -258,7 +259,7 @@ class QualityModuleTest extends TestCase
         ]);
 
         $this->fakeGeminiSummary(
-            "La turbidité mesurée est supérieure au seuil autorisé. Une vérification par les responsables est recommandée.",
+            'La turbidité mesurée est supérieure au seuil autorisé. Une vérification par les responsables est recommandée.',
             ['Turbidité élevée : 9,5 NTU pour un maximum de 5 NTU.'],
         );
 
@@ -407,6 +408,102 @@ class QualityModuleTest extends TestCase
             ->get(route('back.quality-samples.show', $sample))
             ->assertOk()
             ->assertSee("Le résumé intelligent n'est pas disponible pour ce prélèvement.", false);
+    }
+
+    public function test_gemini_summary_is_generated_when_opening_the_detail_page(): void
+    {
+        $gestionnaire = $this->gestionnaire();
+        $zone = Zone::factory()->create();
+        $sample = WaterQualitySample::factory()->nonConforme()->create(['zone_id' => $zone->id]);
+        WaterQualityParameter::factory()->nonConforme()->create(['sample_id' => $sample->id]);
+
+        $this->fakeGeminiSummary(
+            'Résumé généré à l’ouverture de la fiche.',
+            ['Turbidité élevée : 9,5 NTU pour un maximum de 5 NTU.'],
+        );
+
+        $this->actingAs($gestionnaire)
+            ->get(route('back.quality-samples.show', $sample))
+            ->assertOk()
+            ->assertSee('Résumé généré à l’ouverture de la fiche.')
+            ->assertSee('Turbidité élevée : 9,5 NTU pour un maximum de 5 NTU.');
+
+        Http::assertSentCount(1);
+
+        $this->actingAs($gestionnaire)
+            ->get(route('back.quality-samples.show', $sample))
+            ->assertOk()
+            ->assertSee('Résumé généré à l’ouverture de la fiche.');
+
+        Http::assertSentCount(1);
+    }
+
+    public function test_gemini_summary_is_skipped_without_api_key(): void
+    {
+        config(['services.gemini.api_key' => null]);
+        Http::fake();
+
+        $gestionnaire = $this->gestionnaire();
+        $zone = Zone::factory()->create();
+        $sample = WaterQualitySample::factory()->nonConforme()->create(['zone_id' => $zone->id]);
+        WaterQualityParameter::factory()->nonConforme()->create(['sample_id' => $sample->id]);
+
+        $this->actingAs($gestionnaire)
+            ->get(route('back.quality-samples.show', $sample))
+            ->assertOk()
+            ->assertSee("Le résumé intelligent n'est pas disponible pour ce prélèvement.", false);
+
+        Http::assertNothingSent();
+    }
+
+    public function test_gemini_rejections_and_unknown_model_fall_back_gracefully(): void
+    {
+        $gestionnaire = $this->gestionnaire();
+        $zone = Zone::factory()->create();
+        $sample = WaterQualitySample::factory()->nonConforme()->create(['zone_id' => $zone->id]);
+        WaterQualityParameter::factory()->nonConforme()->create(['sample_id' => $sample->id]);
+
+        foreach ([401, 403, 404, 429] as $status) {
+            Cache::flush();
+
+            Http::fake([
+                'generativelanguage.googleapis.com/*' => Http::response([
+                    'error' => [
+                        'status' => $status === 401 ? 'UNAUTHENTICATED' : 'ERROR',
+                        'message' => 'Erreur simulée.',
+                    ],
+                ], $status),
+            ]);
+
+            $this->actingAs($gestionnaire)
+                ->get(route('back.quality-samples.show', $sample))
+                ->assertOk()
+                ->assertSee("Le résumé intelligent n'est pas disponible pour ce prélèvement.", false);
+
+            $this->assertSame('non_conforme', $sample->fresh()->statut);
+            $this->assertSame(1, $sample->parameters()->count());
+        }
+    }
+
+    public function test_malformed_gemini_payload_falls_back_gracefully(): void
+    {
+        Http::fake([
+            'generativelanguage.googleapis.com/*' => Http::response([
+                'candidates' => [['content' => ['parts' => []]]],
+            ]),
+        ]);
+
+        $gestionnaire = $this->gestionnaire();
+        $zone = Zone::factory()->create();
+        $sample = WaterQualitySample::factory()->nonConforme()->create(['zone_id' => $zone->id]);
+        WaterQualityParameter::factory()->nonConforme()->create(['sample_id' => $sample->id]);
+
+        $this->actingAs($gestionnaire)
+            ->get(route('back.quality-samples.show', $sample))
+            ->assertOk()
+            ->assertSee("Le résumé intelligent n'est pas disponible pour ce prélèvement.", false);
+
+        $this->assertSame(1, $sample->parameters()->count());
     }
 
     public function test_repeated_analysis_does_not_duplicate_active_alerts_or_api_calls(): void

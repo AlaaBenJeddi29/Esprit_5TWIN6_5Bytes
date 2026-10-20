@@ -34,8 +34,7 @@ class WaterQualitySampleController extends Controller
     public function __construct(
         private readonly QualityAnalyzer $analyzer,
         private readonly QualityPlanningService $planning,
-    ) {
-    }
+    ) {}
 
     public function index(Request $request): View|Response|RedirectResponse
     {
@@ -201,7 +200,7 @@ class WaterQualitySampleController extends Controller
 
         return view('back.quality.samples.show', [
             'sample' => $sample,
-            'aiSummary' => $this->analyzer->cachedSummary($sample),
+            'aiSummary' => $this->analyzer->summaryForDisplay($sample),
         ]);
     }
 

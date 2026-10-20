@@ -2,8 +2,8 @@
 
 use App\Enums\UserRole;
 use App\Http\Controllers\Back\AlertSubscriptionController as BackAlertSubscriptionController;
-use App\Http\Controllers\Back\ComplaintController;
 use App\Http\Controllers\Back\AuditEventController;
+use App\Http\Controllers\Back\ComplaintController;
 use App\Http\Controllers\Back\ConsumptionReadingController;
 use App\Http\Controllers\Back\ContractorController;
 use App\Http\Controllers\Back\DashboardController;
@@ -33,6 +33,7 @@ use App\Http\Controllers\Front\CitizenDashboardController;
 use App\Http\Controllers\Front\HomeController;
 use App\Http\Controllers\Front\IncidentController as FrontIncidentController;
 use App\Http\Controllers\Front\IncidentFeedbackController as FrontIncidentFeedbackController;
+use App\Http\Controllers\Front\IncidentWritingAssistController as FrontIncidentWritingAssistController;
 use App\Http\Controllers\Front\ProjectController as FrontProjectController;
 use App\Http\Controllers\Front\PublicDroughtController;
 use App\Http\Controllers\Front\PublicInfrastructureController;
@@ -103,6 +104,15 @@ Route::middleware(['auth', 'verified', 'role:citoyen'])
 
         Route::get('/mes-incidents', [FrontIncidentController::class, 'index'])->name('incidents.index');
         Route::get('/signaler', [FrontIncidentController::class, 'create'])->name('incidents.create');
+
+        // Aide consultative à la rédaction (aucune écriture en base).
+        Route::post('/signaler/aide/questions', [FrontIncidentWritingAssistController::class, 'questions'])
+            ->middleware('throttle:8,1')
+            ->name('incidents.assist.questions');
+        Route::post('/signaler/aide/redaction', [FrontIncidentWritingAssistController::class, 'compose'])
+            ->middleware('throttle:8,1')
+            ->name('incidents.assist.compose');
+
         Route::post('/incidents', [FrontIncidentController::class, 'store'])->name('incidents.store');
         Route::get('/mes-incidents/{incident}', [FrontIncidentController::class, 'show'])->name('incidents.show');
         Route::post('/mes-incidents/{incident}/commentaires', [FrontIncidentController::class, 'storeComment'])
@@ -237,7 +247,7 @@ Route::middleware(['auth', 'verified', 'role:gestionnaire,admin'])
             ->names('water-levels')
             ->except(['show'])
             ->parameters(['water-levels' => 'level']);
-        
+
         Route::get('consumption-readings/export/{format}', [ConsumptionReadingController::class, 'export'])
             ->whereIn('format', ['pdf', 'excel', 'csv'])
             ->name('consumption-readings.export');
@@ -247,14 +257,14 @@ Route::middleware(['auth', 'verified', 'role:gestionnaire,admin'])
             ->names('consumption-readings')
             ->except(['show'])
             ->parameters(['consumption-readings' => 'reading']);
-        
+
         Route::get('restrictions/export/{format}', [RestrictionController::class, 'export'])
             ->whereIn('format', ['pdf', 'excel', 'csv'])
             ->name('restrictions.export');
         Route::resource('restrictions', RestrictionController::class)
             ->names('restrictions')
             ->except(['show']);
-        
+
         Route::get('scheduled-cuts/export/{format}', [ScheduledCutController::class, 'export'])
             ->whereIn('format', ['pdf', 'excel', 'csv'])
             ->name('scheduled-cuts.export');
@@ -262,7 +272,7 @@ Route::middleware(['auth', 'verified', 'role:gestionnaire,admin'])
             ->names('scheduled-cuts')
             ->except(['show'])
             ->parameters(['scheduled-cuts' => 'cut']);
-        
+
         Route::get('alert-subscriptions', [BackAlertSubscriptionController::class, 'index'])
             ->name('alert-subscriptions.index');
 

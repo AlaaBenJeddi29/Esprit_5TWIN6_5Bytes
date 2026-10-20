@@ -43,7 +43,7 @@ return [
     'gemini' => [
         'api_key' => env('GEMINI_API_KEY'),
         'model' => env('GEMINI_MODEL', 'gemini-2.5-flash'),
-        'timeout' => (int) env('GEMINI_TIMEOUT', 12),
+        'timeout' => (int) env('GEMINI_TIMEOUT', 45),
         'ca_bundle' => env('GEMINI_CA_BUNDLE'),
     ],
 
@@ -83,7 +83,7 @@ return [
         'reasoning_effort' => env('GROQ_REASONING_EFFORT', 'low'),
         'delay_ms' => max(0, (int) env('GROQ_DELAY_MS', 1000)),
     ],
-   
+
     /* Local LLM layer (Ollama only — Gestion 5 and future modules)
     |--------------------------------------------------------------------------
     |
@@ -124,4 +124,3 @@ return [
     ],
 
 ];
-

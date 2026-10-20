@@ -70,6 +70,82 @@ class GroqAIService
     }
 
     /**
+     * Le fournisseur est-il configuré ? Contrairement à enabled(), cette
+     * vérification ne dépend pas du drapeau de détection de doublons : les
+     * aides consultatives peuvent l'utiliser indépendamment.
+     */
+    public function available(): bool
+    {
+        $apiKey = config('services.groq.key');
+        $url = config('services.groq.url');
+        $model = config('services.groq.model');
+
+        return is_string($apiKey) && trim($apiKey) !== ''
+            && is_string($url) && trim($url) !== ''
+            && is_string($model) && trim($model) !== '';
+    }
+
+    /**
+     * Appel JSON générique pour les aides consultatives (rédaction de
+     * signalement). Aucun prompt ni contenu de signalement n'est journalisé.
+     *
+     * @return array{ok: bool, content: string|null, reason: string|null, status: int|null}
+     */
+    public function completeJson(string $systemPrompt, string $userPrompt, int $maxTokens = 700): array
+    {
+        if (! $this->available()) {
+            return ['ok' => false, 'content' => null, 'reason' => self::FAILURE_UNAVAILABLE, 'status' => null];
+        }
+
+        $apiKey = trim((string) config('services.groq.key'));
+        $url = trim((string) config('services.groq.url', 'https://api.groq.com/openai/v1/chat/completions'));
+        $model = trim((string) config('services.groq.model', 'openai/gpt-oss-120b'));
+
+        if ($url === '' || $model === '') {
+            return ['ok' => false, 'content' => null, 'reason' => self::FAILURE_UNAVAILABLE, 'status' => null];
+        }
+
+        $response = $this->request(
+            $apiKey,
+            $url,
+            $model,
+            [
+                ['role' => 'system', 'content' => $systemPrompt],
+                ['role' => 'user', 'content' => $userPrompt],
+            ],
+            max(128, $maxTokens),
+            true,
+        );
+
+        if (! $response['ok']) {
+            return [
+                'ok' => false,
+                'content' => null,
+                'reason' => $response['reason'] ?? self::FAILURE_HTTP,
+                'status' => $response['status'],
+            ];
+        }
+
+        return [
+            'ok' => true,
+            'content' => (string) $response['content'],
+            'reason' => null,
+            'status' => $response['status'],
+        ];
+    }
+
+    /**
+     * Décode une réponse JSON du modèle (objet ou tableau), avec tolérance aux
+     * blocs Markdown, pour les aides consultatives.
+     *
+     * @return array<int|string, mixed>|null
+     */
+    public function parseJsonObject(string $content): ?array
+    {
+        return $this->decodeJson($content);
+    }
+
+    /**
      * Confirme en un seul appel l'ensemble des candidats d'un incident.
      *
      * @param  list<Incident>  $candidates
