@@ -316,8 +316,11 @@ class IncidentDashboardTest extends TestCase
         $this->actingAs($this->gestionnaire())
             ->get(route('back.dashboard'))
             ->assertOk()
-            ->assertSee('Critiques ouverts')
-            ->assertSee('Non affectés');
+            ->assertSee('Incidents critiques')
+            ->assertSee('Non affectés')
+            ->assertSee('incidentStatusChart')
+            ->assertSee('incidentSeverityChart')
+            ->assertSee('incidentTrendChart');
     }
 
     public function test_incident_index_filters_open_unassigned_incidents(): void

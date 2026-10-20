@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Incident\Incident;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -35,6 +36,71 @@ class IncidentStatsService
             'avg_resolution_h' => $this->averageResolutionHours($start, $end),
             'resolution_rate' => $this->resolutionRate($start, $end),
             'by_zone' => $this->byZone($start, $end),
+        ];
+    }
+
+    /**
+     * Répartition de tous les incidents par statut, dans l'ordre des libellés.
+     *
+     * @return array{labels: array<string, string>, counts: array<string, int>, total: int}
+     */
+    public function statusDistribution(): array
+    {
+        $counts = Incident::query()
+            ->selectRaw('status, COUNT(*) as aggregate')
+            ->groupBy('status')
+            ->pluck('aggregate', 'status');
+
+        return $this->distribution(Incident::STATUSES, $counts);
+    }
+
+    /**
+     * Répartition par gravité des incidents encore ouverts.
+     *
+     * @return array{labels: array<string, string>, counts: array<string, int>, total: int}
+     */
+    public function openSeverityDistribution(): array
+    {
+        $counts = Incident::query()
+            ->open()
+            ->selectRaw('severity, COUNT(*) as aggregate')
+            ->groupBy('severity')
+            ->pluck('aggregate', 'severity');
+
+        return $this->distribution(Incident::SEVERITIES, $counts);
+    }
+
+    /**
+     * Incidents signalés par mois calendaire, mois courant inclus.
+     * Les mois sans signalement sont conservés avec un compte nul.
+     *
+     * @return array{labels: list<string>, counts: list<int>, total: int}
+     */
+    public function monthlyTrend(int $months = 12): array
+    {
+        $months = max(1, $months);
+        $start = now()->startOfMonth()->subMonths($months - 1);
+
+        $counts = Incident::query()
+            ->where('reported_at', '>=', $start)
+            ->selectRaw("DATE_FORMAT(reported_at, '%Y-%m') as period, COUNT(*) as aggregate")
+            ->groupBy('period')
+            ->pluck('aggregate', 'period');
+
+        $labels = [];
+        $values = [];
+
+        for ($offset = 0; $offset < $months; $offset++) {
+            $month = $start->copy()->addMonths($offset);
+
+            $labels[] = $month->translatedFormat('M Y');
+            $values[] = (int) ($counts[$month->format('Y-m')] ?? 0);
+        }
+
+        return [
+            'labels' => $labels,
+            'counts' => $values,
+            'total' => array_sum($values),
         ];
     }
 
@@ -186,6 +252,26 @@ class IncidentStatsService
         }
 
         return $rows;
+    }
+
+    /**
+     * @param  array<string, string>  $labels
+     * @param  Collection<string, int|string>  $counts
+     * @return array{labels: array<string, string>, counts: array<string, int>, total: int}
+     */
+    private function distribution(array $labels, Collection $counts): array
+    {
+        $resolved = [];
+
+        foreach ($labels as $key => $label) {
+            $resolved[$key] = (int) ($counts[$key] ?? 0);
+        }
+
+        return [
+            'labels' => $labels,
+            'counts' => $resolved,
+            'total' => array_sum($resolved),
+        ];
     }
 
     private function periodQuery(?Carbon $start, ?Carbon $end): Builder
