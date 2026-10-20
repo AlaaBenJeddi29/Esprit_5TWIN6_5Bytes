@@ -400,22 +400,27 @@ class IncidentSimilarityAiTest extends TestCase
 
     public function test_a_partial_batch_keeps_valid_items_and_falls_back_for_the_others(): void
     {
-        Http::fake(function (Request $request) {
-            $candidateIds = $this->candidateIdsFromRequest($request);
-
-            return Http::response($this->completion($this->batchJson([
-                $this->verdictPayload($candidateIds[0], true, 90, 'Même problème.'),
-            ])));
-        });
-
         $source = $this->incident();
         $first = $this->incident(['zone_id' => $source->zone_id]);
         $second = $this->incident(['zone_id' => $source->zone_id]);
+
+        Http::fake(function () use ($first) {
+            return Http::response($this->completion($this->batchJson([
+                $this->verdictPayload($first->id, true, 90, 'Même problème.'),
+            ])));
+        });
 
         $suggestions = app(IncidentSimilarityService::class)->detect($source);
 
         $this->assertCount(2, $suggestions);
         Http::assertSentCount(1);
+        Http::assertSent(function (Request $request) use ($first, $second): bool {
+            $candidateIds = $this->candidateIdsFromRequest($request);
+
+            return count($candidateIds) === 2
+                && in_array($first->id, $candidateIds, true)
+                && in_array($second->id, $candidateIds, true);
+        });
 
         $confirmed = $suggestions->firstWhere('similar_incident_id', $first->id);
         $fallback = $suggestions->firstWhere('similar_incident_id', $second->id);

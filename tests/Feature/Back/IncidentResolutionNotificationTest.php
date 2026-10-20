@@ -244,6 +244,7 @@ class IncidentResolutionNotificationTest extends TestCase
         $incident = Incident::factory()->create([
             'user_id' => $citizen->id,
             'zone_id' => $zone->id,
+            'type' => 'qualite',
             'status' => 'en_cours',
             'title' => '<script>alert("titre")</script> Fuite avenue',
             'address' => '<img src=x onerror=alert(1)>',
@@ -273,7 +274,7 @@ class IncidentResolutionNotificationTest extends TestCase
         $this->assertStringContainsString(e($citizen->name), $html);
         $this->assertStringContainsString($incident->reference, $html);
         $this->assertStringContainsString(e($incident->title), $html);
-        $this->assertStringContainsString($incident->typeLabel(), $html);
+        $this->assertStringContainsString(e($incident->typeLabel()), $html);
         $this->assertStringContainsString(e($incident->address), $html);
         $this->assertStringContainsString(e($zone->nom), $html);
         $this->assertStringContainsString('Traité', $html);
