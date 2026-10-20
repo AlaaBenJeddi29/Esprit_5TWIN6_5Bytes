@@ -39,10 +39,14 @@ Plateforme de surveillance citoyenne de l'eau potable (Laravel 12 / Tailwind CSS
    `DemoUsersSeeder` nécessite `AQUASECURE_DEMO_PASSWORD` et les trois emails
    `AQUASECURE_DEMO_*_EMAIL` dans `.env`. `DemoDataSeeder` nécessite un gestionnaire ou
    un administrateur existant.
-7. Lancer l'application :
+7. Lancer l'application (serveur + worker de file d'attente) :
    ```bash
-   php artisan serve
+   composer run dev
    ```
+   `composer run dev` démarre `php artisan serve`, le worker `queue:listen`, Vite et les
+   logs. Sous Windows, `scripts\start-projet.bat` démarre le serveur et le worker (ainsi
+   qu'Ollama). Un `php artisan serve` seul ne traite pas la file (`QUEUE_CONNECTION=database`) :
+   dans ce cas, lancer `php artisan queue:work` dans un second terminal.
    Aucun `php artisan storage:link` n'est nécessaire : les fichiers privés sont servis
    par les contrôleurs.
 

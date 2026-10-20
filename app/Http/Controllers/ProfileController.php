@@ -4,12 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\ProfileUpdateRequest;
 use App\Http\Requests\UpdateProfilePhotoRequest;
+use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Redirect;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use Throwable;
 
 class ProfileController extends Controller
@@ -54,6 +56,22 @@ class ProfileController extends Controller
                     : 'Vos informations ont été mises à jour.',
             )
             ->with('email_changed', $emailChanged);
+    }
+
+    /**
+     * Sert la photo de profil : aucun lien symbolique public/storage n'est requis.
+     */
+    public function showPhoto(User $user): StreamedResponse
+    {
+        $path = $user->avatar_path;
+
+        abort_if($path === null || ! str_starts_with($path, 'avatars/'), 404);
+
+        $disk = Storage::disk('public');
+
+        abort_unless($disk->exists($path), 404);
+
+        return $disk->response($path);
     }
 
     /**

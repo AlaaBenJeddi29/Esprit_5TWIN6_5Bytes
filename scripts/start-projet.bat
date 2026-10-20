@@ -7,7 +7,8 @@ REM  Le script :
 REM    1. verifie que Ollama est installe (sinon tentative via winget) ;
 REM    2. demarre le serveur Ollama s'il ne repond pas sur le port 11434 ;
 REM    3. telecharge le modele llama3.2 s'il est absent ;
-REM    4. lance php artisan serve.
+REM    4. lance le worker de file d'attente (e-mails, taches asynchrones) ;
+REM    5. lance php artisan serve.
 REM
 REM  Si le projet tourne sous XAMPP/Apache (docroot + vhost), retirez la
 REM  derniere ligne (php artisan serve) : Apache sert deja l'application.
@@ -57,7 +58,12 @@ if not defined OLLAMA_BIN (
 )
 
 echo.
-echo [4/4] Demarrage du serveur Laravel...
+echo [4/5] Demarrage du worker de file d'attente...
+echo       ^(necessaire pour l'envoi des e-mails et les taches asynchrones^)
+start "AquaSecure - Queue Worker" cmd /k "php artisan queue:listen --tries=1 --timeout=0"
+
+echo.
+echo [5/5] Demarrage du serveur Laravel...
 echo       ^(retirez cette ligne si vous utilisez XAMPP/Apache^)
 php artisan serve
 
