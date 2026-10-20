@@ -20,7 +20,7 @@ class StoreWaterQualitySampleRequest extends BackOfficeRequest
             'source' => ['nullable', 'string', 'max:80'],
             'notes' => ['nullable', 'string', 'max:2000'],
             'planification_id' => ['nullable', 'integer', 'exists:quality_planifications,id'],
-            'parametres' => ['required', 'array'],
+            'parametres' => ['required', 'array:'.implode(',', array_keys(QualityThreshold::PARAMETRES))],
             'parametres.*' => ['array'],
             'parametres.*.valeur' => ['nullable', 'numeric'],
         ];

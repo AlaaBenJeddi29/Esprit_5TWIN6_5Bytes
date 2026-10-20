@@ -25,7 +25,24 @@
                     'cloturee' => 'bg-gray-1 text-body-color dark:bg-dark-3 dark:text-dark-7',
                     default => 'bg-gray-1 text-body-color',
                 };
+                $inputClass = 'rounded-md border border-stroke bg-white px-4 py-2.5 text-sm text-dark outline-none focus:border-primary dark:border-dark-3 dark:bg-dark-2 dark:text-white';
+                $hasFilters = $search !== '' || $currentComplaintStatus !== '';
             @endphp
+
+            <form novalidate method="GET" class="mb-6 flex flex-wrap gap-3">
+                <input type="search" name="search" value="{{ $search }}" placeholder="Référence ou objet…" class="{{ $inputClass }} max-w-xs">
+                <select name="complaint_status" class="{{ $inputClass }} max-w-xs">
+                    <option value="">Toutes les réclamations</option>
+                    @foreach ($complaintStatuses as $key => $label)
+                        <option value="{{ $key }}" @selected($currentComplaintStatus === $key)>{{ $label }}</option>
+                    @endforeach
+                </select>
+                <input type="hidden" name="per_page" value="{{ $perPage }}">
+                <button type="submit" class="rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-white hover:bg-blue-dark">Filtrer</button>
+                @if ($hasFilters)
+                    <a href="{{ route('citizen.feedbacks.index') }}" class="rounded-md border border-stroke px-5 py-2.5 text-sm text-body-color hover:border-primary hover:text-primary dark:border-dark-3 dark:text-dark-6">Réinitialiser</a>
+                @endif
+            </form>
 
             <div class="overflow-hidden rounded-md bg-white shadow-1 dark:bg-dark-2">
                 @if ($incidents->isNotEmpty())
@@ -82,14 +99,18 @@
                         </table>
                     </div>
 
-                    <div class="border-t border-stroke px-6 py-4 dark:border-dark-3">{{ $incidents->links() }}</div>
+                    <x-front.pagination :paginator="$incidents" label="incidents traités" />
                 @else
                     <div class="px-6 py-14 text-center">
-                        <p class="text-base font-medium text-dark dark:text-white">Aucun incident traité pour le moment</p>
+                        <p class="text-base font-medium text-dark dark:text-white">{{ $hasFilters ? 'Aucun résultat pour ces filtres' : 'Aucun incident traité pour le moment' }}</p>
                         <p class="mx-auto mt-2 max-w-md text-sm text-body-color dark:text-dark-6">
-                            Vous pourrez évaluer un signalement dès que les services techniques l'auront traité.
+                            @if ($hasFilters)
+                                Modifiez ou réinitialisez les filtres pour retrouver vos évaluations.
+                            @else
+                                Vous pourrez évaluer un signalement dès que les services techniques l'auront traité.
+                            @endif
                         </p>
-                        <a href="{{ route('citizen.incidents.index') }}" class="mt-5 inline-flex items-center justify-center rounded-md bg-primary px-5 py-3 text-sm font-medium text-white hover:bg-blue-dark">Voir mes signalements</a>
+                        <a href="{{ $hasFilters ? route('citizen.feedbacks.index') : route('citizen.incidents.index') }}" class="mt-5 inline-flex items-center justify-center rounded-md bg-primary px-5 py-3 text-sm font-medium text-white hover:bg-blue-dark">{{ $hasFilters ? 'Réinitialiser les filtres' : 'Voir mes signalements' }}</a>
                     </div>
                 @endif
             </div>

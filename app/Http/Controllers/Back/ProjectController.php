@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Back;
 
 use App\Enums\UserRole;
+use App\Http\Controllers\Concerns\ResolvesListingFilters;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Project\StoreProjectRequest;
 use App\Http\Requests\Project\UpdateProjectRequest;
@@ -22,10 +23,17 @@ use Illuminate\View\View;
 
 class ProjectController extends Controller
 {
+    use ResolvesListingFilters;
+
     public function index(Request $request): View
     {
         $search = $request->string('search')->toString();
+        $type = $request->string('type')->toString();
         $statut = $request->string('statut')->toString();
+        $zoneId = $request->integer('zone_id');
+        $responsableId = $request->integer('responsable_id');
+        ['from' => $from, 'to' => $to] = $this->listingDateRange($request);
+        $perPage = $this->listingPerPage($request);
 
         $projects = Project::query()
             ->with(['zone', 'responsable'])
@@ -41,16 +49,33 @@ class ProjectController extends Controller
                         ->orWhere('description', 'like', "%{$search}%");
                 });
             })
+            ->when(in_array($type, Project::TYPES, true), fn ($query) => $query->where('type', $type))
             ->when(in_array($statut, Project::STATUTS, true), fn ($query) => $query->where('statut', $statut))
+            ->when($zoneId, fn ($query) => $query->where('zone_id', $zoneId))
+            ->when($responsableId > 0, fn ($query) => $query->where('responsable_id', $responsableId))
+            ->when($from !== null, fn ($query) => $query->whereDate('date_debut', '>=', $from))
+            ->when($to !== null, fn ($query) => $query->whereDate('date_debut', '<=', $to))
             ->orderByDesc('date_debut')
-            ->paginate(15)
+            ->paginate($perPage)
             ->withQueryString();
 
         return view('back.projects.index', [
             'projects' => $projects,
             'search' => $search,
+            'type' => $type,
             'statut' => $statut,
             'statuts' => Project::STATUTS,
+            'types' => Project::TYPES,
+            'zones' => Zone::orderBy('nom')->get(),
+            'responsables' => User::whereIn('role', [
+                UserRole::Gestionnaire->value,
+                UserRole::Admin->value,
+            ])->orderBy('name')->get(),
+            'currentZone' => $zoneId ?: null,
+            'currentResponsable' => $responsableId ?: null,
+            'from' => $from,
+            'to' => $to,
+            'perPage' => $perPage,
         ]);
     }
 
@@ -68,20 +93,39 @@ class ProjectController extends Controller
             ->with('success', "Le projet « {$project->titre} » a été créé.");
     }
 
-    public function show(Project $project): View
+    public function show(Project $project): View|RedirectResponse
     {
-        $project->load([
-            'zone',
-            'infrastructure',
-            'responsable',
-            'projectPhases.contractor',
-            'fundings.donateur',
-            'projectDocuments',
-        ]);
+        $project->load(['zone', 'infrastructure', 'responsable']);
+
+        $phases = $project->projectPhases()
+            ->with('contractor')
+            ->orderBy('id')
+            ->paginate(15, ['*'], 'phases_page')
+            ->withQueryString();
+
+        $fundings = $project->fundings()
+            ->with('donateur')
+            ->orderBy('id')
+            ->paginate(15, ['*'], 'fundings_page')
+            ->withQueryString();
+
+        $documents = $project->projectDocuments()
+            ->orderBy('id')
+            ->paginate(15, ['*'], 'documents_page')
+            ->withQueryString();
+
+        foreach ([$phases, $fundings, $documents] as $section) {
+            if ($section->currentPage() > $section->lastPage()) {
+                return redirect()->to($section->url($section->lastPage()));
+            }
+        }
 
         return view('back.projects.show', [
             'project' => $project,
             'metrics' => new ProjectMetrics($project),
+            'phases' => $phases,
+            'fundings' => $fundings,
+            'documents' => $documents,
         ]);
     }
 

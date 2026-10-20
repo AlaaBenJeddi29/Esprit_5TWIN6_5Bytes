@@ -6,6 +6,7 @@ use App\Models\Project\Funding;
 use App\Models\Project\Project;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Testing\TestResponse;
 use Stripe\ApiRequestor;
 use Tests\Support\FakeStripeHttpClient;
@@ -361,6 +362,7 @@ class StripeDonationTest extends TestCase
 
     public function test_contribution_totals_include_confirmed_payments_only(): void
     {
+        $this->fakeStripe();
         $citizen = User::factory()->citoyen()->create();
         $project = Project::factory()->create(['budget_prevu' => 1000]);
 
@@ -382,6 +384,96 @@ class StripeDonationTest extends TestCase
             ->get(route('citizen.dashboard'))
             ->assertOk()
             ->assertViewHas('donationsTotal', 400.0);
+    }
+
+    public function test_citizen_dashboard_confirms_a_paid_donation_left_pending(): void
+    {
+        $donation = $this->pendingDonation();
+        $client = $this->fakeStripe(null, 'cs_test_123', $this->paidRetrievedSession($donation));
+
+        $this->actingAs($donation->donateur)
+            ->get(route('citizen.dashboard'))
+            ->assertOk()
+            ->assertSee('Payé');
+
+        $this->assertSame('paye', $donation->fresh()->statut_paiement);
+        $this->assertSame(250.0, $donation->project->fundingTotal());
+
+        $this->assertCount(1, $client->requests);
+        $this->assertStringContainsString('/checkout/sessions/cs_test_123', $client->requests[0]['absUrl']);
+    }
+
+    public function test_dashboard_reconciliation_keeps_an_unpaid_donation_pending(): void
+    {
+        $donation = $this->pendingDonation();
+        $this->fakeStripe(null, 'cs_test_123', $this->paidRetrievedSession($donation, ['payment_status' => 'unpaid']));
+
+        $this->actingAs($donation->donateur)
+            ->get(route('citizen.dashboard'))
+            ->assertOk()
+            ->assertSee('En attente');
+
+        $this->assertSame('en_attente', $donation->fresh()->statut_paiement);
+        $this->assertSame(0.0, $donation->project->fundingTotal());
+    }
+
+    public function test_dashboard_reconciliation_never_touches_another_citizens_donation(): void
+    {
+        $mine = $this->pendingDonation('cs_test_mine');
+        $other = $this->pendingDonation('cs_test_other');
+        $client = $this->fakeStripe(null, 'cs_test_mine', $this->paidRetrievedSession($mine));
+
+        $this->actingAs($mine->donateur)
+            ->get(route('citizen.dashboard'))
+            ->assertOk();
+
+        $this->assertSame('paye', $mine->fresh()->statut_paiement);
+        $this->assertSame('en_attente', $other->fresh()->statut_paiement);
+        $this->assertCount(1, $client->requests);
+    }
+
+    public function test_dashboard_reconciliation_survives_a_stripe_failure(): void
+    {
+        $donation = $this->pendingDonation();
+        $this->fakeStripe('cURL error 28: timeout');
+
+        $this->actingAs($donation->donateur)
+            ->get(route('citizen.dashboard'))
+            ->assertOk();
+
+        $this->assertSame('en_attente', $donation->fresh()->statut_paiement);
+    }
+
+    public function test_dashboard_reconciliation_is_throttled_between_visits(): void
+    {
+        $donation = $this->pendingDonation();
+        $this->fakeStripe('cURL error 28: timeout');
+
+        $this->actingAs($donation->donateur)->get(route('citizen.dashboard'))->assertOk();
+        $this->assertSame('en_attente', $donation->fresh()->statut_paiement);
+
+        $client = $this->fakeStripe(null, 'cs_test_123', $this->paidRetrievedSession($donation));
+
+        $this->actingAs($donation->donateur)->get(route('citizen.dashboard'))->assertOk();
+        $this->assertCount(0, $client->requests);
+        $this->assertSame('en_attente', $donation->fresh()->statut_paiement);
+
+        Cache::forget('donations-reconcile:'.$donation->donateur_id);
+
+        $this->actingAs($donation->donateur)->get(route('citizen.dashboard'))->assertOk();
+        $this->assertCount(1, $client->requests);
+        $this->assertSame('paye', $donation->fresh()->statut_paiement);
+    }
+
+    public function test_async_payment_succeeded_webhook_confirms_the_donation(): void
+    {
+        $donation = $this->pendingDonation();
+        [$payload, $signature] = $this->webhookPayload($donation, [], 'checkout.session.async_payment_succeeded');
+
+        $this->postWebhook($payload, $signature)->assertOk();
+
+        $this->assertSame('paye', $donation->fresh()->statut_paiement);
+        $this->assertSame(250.0, $donation->project->fundingTotal());
     }
 
     private function fakeStripe(
@@ -451,8 +543,11 @@ class StripeDonationTest extends TestCase
      * @param  array<string, mixed>  $sessionOverrides
      * @return array{0: string, 1: string}
      */
-    private function webhookPayload(Funding $donation, array $sessionOverrides = []): array
-    {
+    private function webhookPayload(
+        Funding $donation,
+        array $sessionOverrides = [],
+        string $eventType = 'checkout.session.completed',
+    ): array {
         $session = array_merge([
             'id' => $donation->stripe_session_id,
             'object' => 'checkout.session',
@@ -475,7 +570,7 @@ class StripeDonationTest extends TestCase
             'created' => time(),
             'livemode' => false,
             'pending_webhooks' => 1,
-            'type' => 'checkout.session.completed',
+            'type' => $eventType,
             'data' => ['object' => $session],
         ], JSON_UNESCAPED_UNICODE);
 

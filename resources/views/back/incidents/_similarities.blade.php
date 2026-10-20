@@ -38,7 +38,7 @@
                 automatique : chaque décision est prise par un gestionnaire.
             </p>
         </div>
-        <form method="POST" action="{{ route('back.incidents.similarities.detect', $incident) }}">
+        <form novalidate method="POST" action="{{ route('back.incidents.similarities.detect', $incident) }}">
             @csrf
             <button type="submit" class="rounded-lg border border-brand-300 bg-brand-50 px-4 py-2.5 text-sm font-medium text-brand-600 transition hover:bg-brand-100 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-400 dark:hover:bg-brand-500/20">
                 Rechercher les incidents similaires
@@ -108,7 +108,7 @@
                 @endif
 
                 @if ($suggestion->isPending())
-                    <form method="POST" action="{{ route('back.incidents.similarities.decide', [$incident, $suggestion]) }}" class="mt-3 space-y-3">
+                    <form novalidate method="POST" action="{{ route('back.incidents.similarities.decide', [$incident, $suggestion]) }}" class="mt-3 space-y-3">
                         @csrf
                         @method('PATCH')
 

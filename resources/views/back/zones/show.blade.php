@@ -17,7 +17,7 @@
 
     <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <x-back.stat-card label="Population" :value="number_format($zone->population, 0, ',', ' ')" />
-        <x-back.stat-card label="Infrastructures" :value="$zone->infrastructures->count()" />
+        <x-back.stat-card label="Infrastructures" :value="$zone->infrastructures_count" />
         <x-back.stat-card label="Coordonnées" :value="$zone->latitude && $zone->longitude ? $zone->latitude.', '.$zone->longitude : '—'" />
     </div>
 
@@ -27,7 +27,7 @@
             <a href="{{ route('back.infrastructures.create') }}" class="text-xs font-medium text-brand-500 hover:underline dark:text-brand-400">Ajouter une infrastructure</a>
         </div>
 
-        @if ($zone->infrastructures->isNotEmpty())
+        @if ($infrastructures->isNotEmpty())
             <div class="overflow-x-auto">
                 <table class="w-full">
                     <thead>
@@ -38,7 +38,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach ($zone->infrastructures as $infrastructure)
+                        @foreach ($infrastructures as $infrastructure)
                             <tr class="border-b border-gray-100 transition-colors last:border-0 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/[0.02]">
                                 <td class="px-5 py-3">
                                     <a href="{{ route('back.infrastructures.show', $infrastructure) }}" class="text-sm font-medium text-brand-500 hover:underline dark:text-brand-400">{{ $infrastructure->nom }}</a>
@@ -50,6 +50,8 @@
                     </tbody>
                 </table>
             </div>
+
+            <x-back.pagination :paginator="$infrastructures" label="infrastructures" :showPerPage="false" />
         @else
             <div class="p-5">
                 <x-back.empty-state title="Aucune infrastructure" message="Cette zone ne contient encore aucune infrastructure." />

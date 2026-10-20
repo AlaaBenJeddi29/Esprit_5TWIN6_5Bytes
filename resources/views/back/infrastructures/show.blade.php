@@ -35,7 +35,7 @@
             <a href="{{ route('back.maintenances.create', ['infrastructure_id' => $infrastructure->id]) }}" class="text-xs font-medium text-brand-500 hover:underline dark:text-brand-400">Planifier une maintenance</a>
         </div>
 
-        @if ($infrastructure->maintenances->isNotEmpty())
+        @if ($maintenances->isNotEmpty())
             <div class="overflow-x-auto">
                 <table class="w-full">
                     <thead>
@@ -47,7 +47,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach ($infrastructure->maintenances as $maintenance)
+                        @foreach ($maintenances as $maintenance)
                             <tr class="border-b border-gray-100 transition-colors last:border-0 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/[0.02]">
                                 <td class="px-5 py-3">
                                     <a href="{{ route('back.maintenances.show', $maintenance) }}" class="text-sm font-medium text-brand-500 hover:underline dark:text-brand-400">{{ $maintenance->type }}</a>
@@ -60,6 +60,8 @@
                     </tbody>
                 </table>
             </div>
+
+            <x-back.pagination :paginator="$maintenances" label="maintenances" :showPerPage="false" />
         @else
             <div class="p-5">
                 <x-back.empty-state title="Aucune maintenance" message="Aucune intervention n'est planifiée pour cette infrastructure." />

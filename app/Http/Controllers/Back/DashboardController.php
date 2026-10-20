@@ -28,14 +28,13 @@ class DashboardController extends Controller
         $pendingReports = Report::where('status', 'nouveau')->count();
         $totalUsers = User::count();
 
-        $statusCounts = Report::query()
-            ->selectRaw('status, count(*) as aggregate')
-            ->groupBy('status')
-            ->pluck('aggregate', 'status');
+        $statusChart = $this->incidentStats->statusDistribution();
+        $severityChart = $this->incidentStats->openSeverityDistribution();
+        $trendChart = $this->incidentStats->monthlyTrend();
 
-        $latestReports = Report::query()
-            ->with('user')
-            ->latest()
+        $latestIncidents = Incident::query()
+            ->with('zone')
+            ->latest('reported_at')
             ->take(5)
             ->get();
 
@@ -43,22 +42,20 @@ class DashboardController extends Controller
             'totalReports' => $totalReports,
             'pendingReports' => $pendingReports,
             'totalUsers' => $totalUsers,
-            'statusCounts' => $statusCounts,
-            'statuses' => Report::STATUSES,
-            'latestReports' => $latestReports,
-            'totalIncidents' => Incident::count(),
-            'openIncidents' => Incident::open()->count(),
+            'latestIncidents' => $latestIncidents,
+            'totalIncidents' => $statusChart['total'],
+            'openIncidents' => $severityChart['total'],
             'criticalOpenIncidents' => $this->incidentStats->criticalOpen(),
             'unassignedOpenIncidents' => $this->incidentStats->unassignedOpen(),
             'samplesThisMonth' => WaterQualitySample::where('date_prelevement', '>=', now()->startOfMonth())->count(),
             'activeQualityAlerts' => WaterQualityAlert::where('statut', 'active')->count(),
             'activeRestrictions' => Restriction::where('statut', 'active')->count(),
             'upcomingCuts' => ScheduledCut::whereIn('statut', ['planifiee', 'en_cours'])->count(),
-            'latestIncidents' => Incident::query()
-                ->with(['zone', 'user'])
-                ->latest('reported_at')
-                ->take(5)
-                ->get(),
+            'chartData' => [
+                'status' => $statusChart,
+                'severity' => $severityChart,
+                'trend' => $trendChart,
+            ],
         ]);
     }
 }

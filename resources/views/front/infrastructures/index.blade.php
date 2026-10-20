@@ -15,7 +15,8 @@
                 $inputClass = 'w-full rounded-md border border-stroke bg-white px-4 py-2.5 text-sm text-dark outline-none focus:border-primary dark:border-dark-3 dark:bg-dark-2 dark:text-white';
             @endphp
 
-            <form method="GET" class="mb-8 flex flex-wrap gap-3">
+            <form novalidate method="GET" class="mb-8 flex flex-wrap gap-3">
+                <input type="search" name="search" value="{{ $search }}" placeholder="Nom de l'ouvrage…" class="{{ $inputClass }} max-w-xs">
                 <select name="zone_id" class="{{ $inputClass }} max-w-xs">
                     <option value="">Toutes les zones</option>
                     @foreach ($zones as $zone)
@@ -34,10 +35,10 @@
                         <option value="{{ $statut }}" @selected($currentStatut === $statut)>{{ ucfirst(str_replace('_', ' ', $statut)) }}</option>
                     @endforeach
                 </select>
+                <input type="hidden" name="per_page" value="{{ $perPage }}">
                 <button type="submit" class="rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-white hover:bg-blue-dark">Filtrer</button>
                 <a href="{{ route('public.infrastructures.index') }}" class="rounded-md border border-stroke px-5 py-2.5 text-sm text-body-color hover:border-primary hover:text-primary dark:border-dark-3 dark:text-dark-6">Réinitialiser</a>
             </form>
-
             {{-- Carte schématique --}}
             <div class="mb-10">
                 <h2 class="mb-4 text-xl font-bold text-dark dark:text-white">Carte du réseau</h2>
@@ -87,7 +88,7 @@
             {{-- Liste --}}
             <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
                 <h2 class="text-xl font-bold text-dark dark:text-white">Ouvrages répertoriés</h2>
-                <p class="text-sm text-body-color dark:text-dark-6">{{ $infrastructures->count() }} résultat(s)</p>
+                <p class="text-sm text-body-color dark:text-dark-6">{{ $infrastructures->total() }} résultat(s)</p>
             </div>
 
             <div class="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
@@ -128,6 +129,10 @@
                     </div>
                 @endforelse
             </div>
+
+            @if ($infrastructures->isNotEmpty())
+                <x-front.pagination :paginator="$infrastructures" label="ouvrages" class="mt-8 !border-0 !px-0" />
+            @endif
         </div>
     </section>
 @endsection

@@ -16,7 +16,7 @@
                     $inputClass = 'w-full rounded-md border border-stroke bg-transparent px-5 py-3 text-sm text-dark outline-none focus:border-primary dark:border-dark-3 dark:text-white';
                 @endphp
 
-                <form method="POST" action="{{ route('front.incidents.track') }}" class="rounded-md bg-white p-6 shadow-1 dark:bg-dark-2">
+                <form novalidate method="POST" action="{{ route('front.incidents.track') }}" class="rounded-md bg-white p-6 shadow-1 dark:bg-dark-2">
                     @csrf
                     <label for="reference" class="mb-2 block text-sm font-medium text-dark dark:text-white">Référence du signalement <span class="text-red-500">*</span></label>
                     <div class="flex flex-wrap gap-3">

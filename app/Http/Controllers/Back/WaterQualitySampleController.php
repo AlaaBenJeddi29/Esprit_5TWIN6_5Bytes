@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Back;
 
+use App\Http\Controllers\Concerns\ResolvesListingFilters;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Quality\StoreWaterQualitySampleRequest;
 use App\Http\Requests\Quality\UpdateWaterQualitySampleRequest;
@@ -23,6 +24,8 @@ use Illuminate\View\View;
 
 class WaterQualitySampleController extends Controller
 {
+    use ResolvesListingFilters;
+
     private const EVOLUTION_LIMIT = 20;
 
     /** Fenêtre utilisée par QualityAnalyzer::zoneSummary() pour la tendance. */
@@ -31,8 +34,7 @@ class WaterQualitySampleController extends Controller
     public function __construct(
         private readonly QualityAnalyzer $analyzer,
         private readonly QualityPlanningService $planning,
-    ) {
-    }
+    ) {}
 
     public function index(Request $request): View|Response|RedirectResponse
     {
@@ -43,6 +45,9 @@ class WaterQualitySampleController extends Controller
         $search = $request->string('search')->toString();
         $statut = $request->string('statut')->toString();
         $zoneId = $request->integer('zone_id');
+        $infrastructureId = $request->integer('infrastructure_id');
+        $dates = $this->listingDateRange($request);
+        $perPage = $this->listingPerPage($request);
 
         $zones = Zone::orderBy('nom')->get();
 
@@ -51,8 +56,11 @@ class WaterQualitySampleController extends Controller
             ->when($search !== '', fn ($query) => $query->where('reference', 'like', "%{$search}%"))
             ->when(array_key_exists($statut, WaterQualitySample::STATUTS), fn ($query) => $query->where('statut', $statut))
             ->when($zoneId, fn ($query) => $query->where('zone_id', $zoneId))
+            ->when($infrastructureId, fn ($query) => $query->where('infrastructure_id', $infrastructureId))
+            ->when($dates['from'], fn ($query) => $query->whereDate('date_prelevement', '>=', $dates['from']))
+            ->when($dates['to'], fn ($query) => $query->whereDate('date_prelevement', '<=', $dates['to']))
             ->latest('date_prelevement')
-            ->paginate(15)
+            ->paginate($perPage)
             ->withQueryString();
 
         $perimetreId = $request->integer('perimetre');
@@ -74,9 +82,14 @@ class WaterQualitySampleController extends Controller
             'samples' => $samples,
             'statuts' => WaterQualitySample::STATUTS,
             'zones' => $zones,
+            'infrastructures' => Infrastructure::orderBy('nom')->get(),
             'search' => $search,
             'currentStatut' => $statut,
             'currentZone' => $zoneId ?: null,
+            'currentInfrastructure' => $infrastructureId ?: null,
+            'from' => $dates['from'],
+            'to' => $dates['to'],
+            'perPage' => $perPage,
             'stats' => $this->analyzer->statistics(),
             'perimetre' => $perimetre,
             'perimetreTrends' => $perimetreTrends,
@@ -187,7 +200,7 @@ class WaterQualitySampleController extends Controller
 
         return view('back.quality.samples.show', [
             'sample' => $sample,
-            'aiSummary' => $this->analyzer->cachedSummary($sample),
+            'aiSummary' => $this->analyzer->summaryForDisplay($sample),
         ]);
     }
 

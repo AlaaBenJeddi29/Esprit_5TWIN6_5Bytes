@@ -3,18 +3,37 @@
 @section('title', 'AquaSecure — Affectations des zones qualité')
 
 @section('content')
+    @php
+        $inputClass = 'rounded-lg border-gray-300 bg-white text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90';
+    @endphp
+
     <x-back.page-header title="Affectations des zones qualité" desc="Définissez les zones que chaque gestionnaire peut consulter et planifier. Les administrateurs conservent l'accès à toutes les zones." />
 
+    <form novalidate method="GET" class="mb-5 flex flex-wrap gap-2">
+        <input type="search" name="search" value="{{ $search }}" placeholder="Nom ou e-mail du gestionnaire…" class="w-full max-w-xs {{ $inputClass }}">
+        <input type="hidden" name="per_page" value="{{ $perPage }}">
+        <button type="submit" class="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">Filtrer</button>
+        @if ($search !== '')
+            <a href="{{ route('back.quality-assignments.index') }}" class="inline-flex items-center px-2 text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300">Réinitialiser</a>
+        @endif
+    </form>
+
     @if ($gestionnaires->isEmpty())
-        <x-back.empty-state title="Aucun gestionnaire" message="Créez un compte gestionnaire depuis le menu Gestionnaires pour lui affecter des zones qualité." />
+        <x-back.empty-state title="Aucun gestionnaire" :message="$search !== '' ? 'Aucun gestionnaire ne correspond à la recherche.' : 'Créez un compte gestionnaire depuis le menu Gestionnaires pour lui affecter des zones qualité.'" />
     @else
         <div class="space-y-5">
             @foreach ($gestionnaires as $gestionnaire)
                 @php
                     $assigned = $assignments->get($gestionnaire->id, []);
+                    $oldGestionnaireId = old('gestionnaire_id');
+                    $isOldTarget = is_scalar($oldGestionnaireId) && (int) $oldGestionnaireId === $gestionnaire->id;
+
+                    if ($isOldTarget) {
+                        $assigned = array_map('intval', array_filter((array) old('zone_ids', []), 'is_scalar'));
+                    }
                 @endphp
 
-                <form method="POST" action="{{ route('back.quality-assignments.update') }}" class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
+                <form novalidate method="POST" action="{{ route('back.quality-assignments.update') }}" class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
                     @csrf
                     @method('PUT')
                     <input type="hidden" name="gestionnaire_id" value="{{ $gestionnaire->id }}">
@@ -44,6 +63,10 @@
                     @endif
                 </form>
             @endforeach
+        </div>
+
+        <div class="mt-5 rounded-2xl border border-gray-200 bg-white px-5 py-4 dark:border-gray-800 dark:bg-white/[0.03]">
+            <x-back.pagination :paginator="$gestionnaires" label="gestionnaires" class="!border-0 !p-0" />
         </div>
     @endif
 @endsection

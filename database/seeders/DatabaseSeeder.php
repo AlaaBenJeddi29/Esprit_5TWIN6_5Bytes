@@ -38,6 +38,11 @@ class DatabaseSeeder extends Seeder
             // Signalements de démonstration
             ReportSeeder::class,
 
+            // Jeux de démonstration IA et détection d'incidents similaires
+            // (références stables, idempotents, dépendent des zones et infrastructures)
+            IncidentAiDemoSeeder::class,
+            IncidentSimilarityDemoSeeder::class,
+
             // Données de test de la gestion sécheresse (dépendent des zones)
             ZoneTestSeeder::class,
             DroughtTestDataSeeder::class,

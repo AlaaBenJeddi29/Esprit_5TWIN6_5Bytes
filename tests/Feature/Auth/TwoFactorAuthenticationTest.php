@@ -378,6 +378,43 @@ class TwoFactorAuthenticationTest extends TestCase
         $this->assertGuest();
     }
 
+    public function test_cancelling_a_pending_setup_forgets_the_temporary_secret(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->post(route('two-factor.setup'), ['current_password' => 'password'])
+            ->assertRedirect(route('two-factor.setup.show'));
+
+        $this->assertNotNull(session('two-factor.setup.secret'));
+
+        $this->post(route('two-factor.setup.cancel'))
+            ->assertRedirect(route('two-factor.show'))
+            ->assertSessionHas('status', 'Configuration annulée.')
+            ->assertSessionMissing('two-factor.setup.secret')
+            ->assertSessionMissing('two-factor.setup.started_at');
+
+        $this->assertFalse($user->fresh()->hasEnabledTwoFactorAuthentication());
+    }
+
+    public function test_cancelling_a_pending_login_invalidates_the_challenge_session(): void
+    {
+        $user = User::factory()->create();
+        $this->enableTwoFactor($user);
+
+        $this->login($user)->assertRedirect(route('two-factor.login'));
+        $this->assertGuest();
+        $this->assertSame($user->id, session('two-factor.login.id'));
+
+        $this->post(route('two-factor.login.cancel'))
+            ->assertRedirect(route('login'))
+            ->assertSessionHas('status', 'Connexion annulée.');
+
+        $this->assertGuest();
+        $this->assertNull(session('two-factor.login.id'));
+        $this->get(route('two-factor.login'))->assertRedirect(route('login'));
+    }
+
     public function test_pending_challenge_expires_after_ten_minutes(): void
     {
         $user = User::factory()->create();

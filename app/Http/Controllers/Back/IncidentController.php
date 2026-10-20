@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Back;
 
 use App\Exceptions\InvalidIncidentTransitionException;
+use App\Http\Controllers\Concerns\ResolvesListingFilters;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Incident\StoreBackIncidentRequest;
 use App\Http\Requests\Incident\StoreIncidentCommentRequest;
@@ -25,6 +26,8 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class IncidentController extends Controller
 {
+    use ResolvesListingFilters;
+
     public function __construct(
         private readonly IncidentWorkflowService $workflow,
         private readonly IncidentSimilarityService $similarityService,
@@ -36,10 +39,15 @@ class IncidentController extends Controller
         $status = $request->string('status')->toString();
         $type = $request->string('type')->toString();
         $severity = $request->string('severity')->toString();
+        $priority = $request->string('priority')->toString();
         $zoneId = $request->integer('zone_id');
+        $assignedTo = $request->integer('assigned_to');
+        $infrastructureId = $request->integer('infrastructure_id');
         $unassigned = $request->boolean('unassigned');
         $open = $request->boolean('open');
         $similar = $request->boolean('similar');
+        ['from' => $from, 'to' => $to] = $this->listingDateRange($request);
+        $perPage = $this->listingPerPage($request);
         $similaritiesAvailable = Schema::hasTable('incident_similarities');
 
         $incidents = Incident::query()
@@ -58,7 +66,12 @@ class IncidentController extends Controller
             ->when(array_key_exists($status, Incident::STATUSES), fn ($query) => $query->where('status', $status))
             ->when(array_key_exists($type, Incident::TYPES), fn ($query) => $query->where('type', $type))
             ->when(array_key_exists($severity, Incident::SEVERITIES), fn ($query) => $query->where('severity', $severity))
+            ->when(array_key_exists($priority, Incident::PRIORITIES), fn ($query) => $query->where('priority', $priority))
             ->when($zoneId, fn ($query) => $query->where('zone_id', $zoneId))
+            ->when($assignedTo > 0, fn ($query) => $query->where('assigned_to', $assignedTo))
+            ->when($infrastructureId > 0, fn ($query) => $query->where('infrastructure_id', $infrastructureId))
+            ->when($from !== null, fn ($query) => $query->whereDate('reported_at', '>=', $from))
+            ->when($to !== null, fn ($query) => $query->whereDate('reported_at', '<=', $to))
             ->when($open, fn ($query) => $query->open())
             ->when(
                 $similaritiesAvailable && $similar,
@@ -72,7 +85,7 @@ class IncidentController extends Controller
                 fn ($query) => $query->whereNull('assigned_to')->where('is_duplicate', false)
             )
             ->latest('reported_at')
-            ->paginate(15)
+            ->paginate($perPage)
             ->withQueryString();
 
         return view('back.incidents.index', [
@@ -80,15 +93,27 @@ class IncidentController extends Controller
             'statuses' => Incident::STATUSES,
             'types' => Incident::TYPES,
             'severities' => Incident::SEVERITIES,
+            'priorities' => Incident::PRIORITIES,
             'zones' => Zone::orderBy('nom')->get(),
+            'infrastructures' => Infrastructure::orderBy('nom')->get(),
+            'gestionnaires' => User::query()
+                ->whereIn('role', ['gestionnaire', 'admin'])
+                ->orderBy('name')
+                ->get(),
             'search' => $search,
             'currentStatus' => $status,
             'currentType' => $type,
             'currentSeverity' => $severity,
+            'currentPriority' => $priority,
             'currentZone' => $zoneId ?: null,
+            'currentAssignee' => $assignedTo ?: null,
+            'currentInfrastructure' => $infrastructureId ?: null,
             'currentUnassigned' => $unassigned,
             'currentOpen' => $open,
             'currentSimilar' => $similar,
+            'from' => $from,
+            'to' => $to,
+            'perPage' => $perPage,
             'similaritiesAvailable' => $similaritiesAvailable,
         ]);
     }

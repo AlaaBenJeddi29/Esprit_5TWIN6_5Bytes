@@ -34,7 +34,7 @@
                         <p class="font-medium text-gray-900">La protection ne sera activée qu’après validation d’un code correct.</p>
                     </div>
 
-                    <form method="POST" action="{{ route('two-factor.confirm') }}" class="mt-6 space-y-6">
+                    <form novalidate method="POST" action="{{ route('two-factor.confirm') }}" class="mt-6 space-y-6">
                         @csrf
 
                         <div>
@@ -58,7 +58,7 @@
                         </div>
                     </form>
 
-                    <form method="POST" action="{{ route('two-factor.setup.cancel') }}" class="mt-6">
+                    <form novalidate method="POST" action="{{ route('two-factor.setup.cancel') }}" class="mt-6">
                         @csrf
                         <button type="submit" class="text-sm font-medium text-gray-600 hover:text-gray-900">
                             Annuler la configuration

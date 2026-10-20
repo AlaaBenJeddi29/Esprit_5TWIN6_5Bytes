@@ -82,6 +82,75 @@ class QualityAnalyzer
     }
 
     /**
+     * Résumé affiché sur la fiche d'un prélèvement. Réutilise le cache s'il
+     * est disponible, sinon tente une génération à partir des mesures déjà
+     * enregistrées, sans recalculer le score ni recréer les alertes.
+     *
+     * @return array{resume: string, anomalies: list<string>, genere_le: string|null}|null
+     */
+    public function summaryForDisplay(WaterQualitySample $sample): ?array
+    {
+        $cached = $this->cachedSummary($sample);
+
+        if ($cached !== null) {
+            return $cached;
+        }
+
+        $apiKey = config('services.gemini.api_key');
+
+        if (! is_string($apiKey) || trim($apiKey) === '') {
+            return null;
+        }
+
+        $sample->loadMissing(['zone', 'parameters']);
+
+        if ($sample->parameters->isEmpty()) {
+            return null;
+        }
+
+        $aiParameters = $sample->parameters
+            ->map(function (WaterQualityParameter $parameter) use ($sample): array {
+                $threshold = $this->thresholdFor($sample, $parameter->parametre);
+
+                return [
+                    'code' => $parameter->parametre,
+                    'parametre' => QualityThreshold::PARAMETRES[$parameter->parametre] ?? $parameter->parametre,
+                    'valeur' => (float) $parameter->valeur,
+                    'unite' => $parameter->unite,
+                    'seuil_min' => $parameter->seuil_min !== null ? (float) $parameter->seuil_min : null,
+                    'seuil_max' => $parameter->seuil_max !== null ? (float) $parameter->seuil_max : null,
+                    'origine_seuil' => $threshold ? 'base_de_donnees' : 'valeur_par_defaut',
+                    'conforme' => (bool) $parameter->est_conforme,
+                ];
+            })
+            ->values()
+            ->all();
+
+        $payload = [
+            'zone' => $sample->zone?->nom,
+            'date_prelevement' => $sample->date_prelevement?->toIso8601String(),
+            'statut' => (string) $sample->statut,
+            'score' => (float) ($sample->score ?? 0),
+            'non_conformes' => $sample->parameters
+                ->filter(fn (WaterQualityParameter $parameter): bool => ! (bool) $parameter->est_conforme)
+                ->count(),
+            'parametres' => $aiParameters,
+        ];
+
+        $result = $this->aiSummary($sample, $payload);
+
+        if ($result === null) {
+            return null;
+        }
+
+        return [
+            'resume' => $result['resume'],
+            'anomalies' => $result['anomalies'],
+            'genere_le' => $result['genere_le'] ?? now()->format('d/m/Y H:i'),
+        ];
+    }
+
+    /**
      * Synthèse publique d'une zone (dernier prélèvement, tendance, alertes).
      *
      * @return array{latest: WaterQualitySample|null, score_moyen: float|null, tendance: string, alertes_actives: int, conformite_90j: float|null}
@@ -545,18 +614,30 @@ class QualityAnalyzer
                     'generationConfig' => $generationConfig,
                 ]
             );
-        } catch (ConnectionException) {
-            Log::warning('Gemini quality summary connection failed.');
+        } catch (ConnectionException $exception) {
+            Log::warning('Gemini quality summary connection failed.', [
+                'exception' => $exception::class,
+                'code' => $exception->getCode(),
+                'timeout' => $timeout,
+                'message' => mb_substr($exception->getMessage(), 0, 300),
+            ]);
 
             return null;
         } catch (Throwable $exception) {
-            Log::warning('Gemini quality summary request failed.', ['exception' => $exception::class]);
+            Log::warning('Gemini quality summary request failed.', [
+                'exception' => $exception::class,
+                'code' => $exception->getCode(),
+                'message' => mb_substr($exception->getMessage(), 0, 300),
+            ]);
 
             return null;
         }
 
         if (! $response->successful()) {
-            Log::warning('Gemini quality summary request was rejected.', ['status' => $response->status()]);
+            Log::warning('Gemini quality summary request was rejected.', [
+                'status' => $response->status(),
+                'error_status' => $response->json('error.status'),
+            ]);
 
             return null;
         }

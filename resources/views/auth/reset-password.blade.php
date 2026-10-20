@@ -18,7 +18,7 @@
                         Renseignez votre adresse e-mail et votre nouveau mot de passe.
                     </p>
 
-                    <form method="POST" action="{{ route('password.store') }}" class="text-left">
+                    <form novalidate method="POST" action="{{ route('password.store') }}" class="text-left">
                         @csrf
 
                         <input type="hidden" name="token" value="{{ $request->route('token') }}" />

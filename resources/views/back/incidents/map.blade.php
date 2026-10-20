@@ -51,7 +51,7 @@
         </div>
 
         {{-- Filtres --}}
-        <form
+        <form novalidate
             method="GET"
             action="{{ route('back.incidents.map') }}"
             data-incident-map-filters

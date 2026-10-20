@@ -3,6 +3,7 @@
 use App\Http\Controllers\Monitoring\MetricsController;
 use App\Http\Middleware\CollectHttpMetrics;
 use App\Http\Middleware\EnsureUserRole;
+use App\Http\Middleware\RejectArrayQueryParameters;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -25,6 +26,14 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'role' => EnsureUserRole::class,
+        ]);
+
+        $middleware->web(append: [
+            RejectArrayQueryParameters::class,
+        ]);
+
+        $middleware->api(append: [
+            RejectArrayQueryParameters::class,
         ]);
 
         // Webhook Stripe uniquement : pas de jeton CSRF (authentifié par la

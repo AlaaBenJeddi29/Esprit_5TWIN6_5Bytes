@@ -28,7 +28,7 @@
         </x-slot:action>
     </x-back.page-header>
 
-    <form method="GET" action="{{ route('back.quality-planifications.calendar') }}" class="mb-5 flex flex-wrap items-end gap-3 rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-white/[0.03]">
+    <form novalidate method="GET" action="{{ route('back.quality-planifications.calendar') }}" class="mb-5 flex flex-wrap items-end gap-3 rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-white/[0.03]">
         <div>
             <label for="calendar-month" class="mb-1 block text-sm text-gray-500 dark:text-gray-400">Mois</label>
             <input type="month" id="calendar-month" name="month" value="{{ $month->format('Y-m') }}" class="{{ $inputClass }}">

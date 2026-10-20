@@ -16,6 +16,32 @@
                 <a href="{{ route('citizen.incidents.create') }}" class="inline-flex items-center justify-center rounded-md bg-primary px-5 py-3 text-sm font-medium text-white hover:bg-blue-dark">Nouveau signalement</a>
             </div>
 
+            @php
+                $inputClass = 'rounded-md border border-stroke bg-white px-4 py-2.5 text-sm text-dark outline-none focus:border-primary dark:border-dark-3 dark:bg-dark-2 dark:text-white';
+                $hasFilters = $search !== '' || $currentStatut !== '' || $currentType !== '';
+            @endphp
+
+            <form novalidate method="GET" class="mb-6 flex flex-wrap gap-3">
+                <input type="search" name="search" value="{{ $search }}" placeholder="Référence ou objet…" class="{{ $inputClass }} max-w-xs">
+                <select name="statut" class="{{ $inputClass }} max-w-xs">
+                    <option value="">Tous les statuts</option>
+                    @foreach ($statuses as $key => $label)
+                        <option value="{{ $key }}" @selected($currentStatut === $key)>{{ $label }}</option>
+                    @endforeach
+                </select>
+                <select name="type" class="{{ $inputClass }} max-w-xs">
+                    <option value="">Tous les types</option>
+                    @foreach ($types as $key => $label)
+                        <option value="{{ $key }}" @selected($currentType === $key)>{{ $label }}</option>
+                    @endforeach
+                </select>
+                <input type="hidden" name="per_page" value="{{ $perPage }}">
+                <button type="submit" class="rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-white hover:bg-blue-dark">Filtrer</button>
+                @if ($hasFilters)
+                    <a href="{{ route('citizen.incidents.index') }}" class="rounded-md border border-stroke px-5 py-2.5 text-sm text-body-color hover:border-primary hover:text-primary dark:border-dark-3 dark:text-dark-6">Réinitialiser</a>
+                @endif
+            </form>
+
             <div class="overflow-hidden rounded-md bg-white shadow-1 dark:bg-dark-2">
                 @if ($incidents->isNotEmpty())
                     @php
@@ -63,14 +89,18 @@
                         </table>
                     </div>
 
-                    <div class="border-t border-stroke px-6 py-4 dark:border-dark-3">{{ $incidents->links() }}</div>
+                    <x-front.pagination :paginator="$incidents" label="signalements" />
                 @else
                     <div class="px-6 py-14 text-center">
-                        <p class="text-base font-medium text-dark dark:text-white">Aucun signalement pour le moment</p>
+                        <p class="text-base font-medium text-dark dark:text-white">{{ $hasFilters ? 'Aucun signalement ne correspond aux filtres' : 'Aucun signalement pour le moment' }}</p>
                         <p class="mx-auto mt-2 max-w-md text-sm text-body-color dark:text-dark-6">
-                            Une fuite, une coupure ou un problème de qualité ? Signalez-le pour aider les services techniques à intervenir.
+                            @if ($hasFilters)
+                                Modifiez ou réinitialisez les filtres pour retrouver vos signalements.
+                            @else
+                                Une fuite, une coupure ou un problème de qualité ? Signalez-le pour aider les services techniques à intervenir.
+                            @endif
                         </p>
-                        <a href="{{ route('citizen.incidents.create') }}" class="mt-5 inline-flex items-center justify-center rounded-md bg-primary px-5 py-3 text-sm font-medium text-white hover:bg-blue-dark">Créer un signalement</a>
+                        <a href="{{ $hasFilters ? route('citizen.incidents.index') : route('citizen.incidents.create') }}" class="mt-5 inline-flex items-center justify-center rounded-md bg-primary px-5 py-3 text-sm font-medium text-white hover:bg-blue-dark">{{ $hasFilters ? 'Réinitialiser les filtres' : 'Créer un signalement' }}</a>
                     </div>
                 @endif
             </div>
