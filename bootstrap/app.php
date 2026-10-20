@@ -15,14 +15,9 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
         then: function () {
-<<<<<<< Updated upstream
-            Route::get('/metrics', MetricsController::class)
-                ->name('monitoring.metrics');
-=======
             // Plain route (no web/api group): Prometheus scrapes it without
             // creating sessions, cookies, or database-backed session rows.
             Route::get('/metrics', MetricsController::class)->name('monitoring.metrics');
->>>>>>> Stashed changes
         },
     )
     ->withMiddleware(function (Middleware $middleware): void {
