@@ -147,12 +147,26 @@
                                 <div>
                                     <span class="block text-sm font-medium text-dark dark:text-white">Note de satisfaction <span class="text-red-500">*</span></span>
                                     <div class="mt-2 flex items-center gap-1">
-                                        @for ($star = 1; $star <= 5; $star++)
-                                            <label class="cursor-pointer" title="{{ $star }} étoile{{ $star > 1 ? 's' : '' }}">
-                                                <input type="radio" name="rating" value="{{ $star }}" class="peer sr-only" required @checked((int) old('rating') === $star)>
-                                                <span class="text-3xl leading-none text-gray-300 transition peer-checked:text-yellow-400">{{ '★' }}</span>
-                                            </label>
-                                        @endfor
+                                        <div class="rating-stars flex items-center gap-1">
+                                            @for ($star = 1; $star <= 5; $star++)
+                                                <label
+                                                    for="rating-{{ $star }}"
+                                                    class="cursor-pointer rounded-sm focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2 dark:focus-within:ring-offset-dark-2"
+                                                    title="{{ $star }} étoile{{ $star > 1 ? 's' : '' }}"
+                                                >
+                                                    <input
+                                                        type="radio"
+                                                        id="rating-{{ $star }}"
+                                                        name="rating"
+                                                        value="{{ $star }}"
+                                                        class="sr-only"
+                                                        required
+                                                        @checked((int) old('rating') === $star)
+                                                    >
+                                                    <span class="rating-star text-3xl leading-none text-gray-300 transition">{{ '★' }}</span>
+                                                </label>
+                                            @endfor
+                                        </div>
                                         <span class="ml-2 text-xs text-body-color dark:text-dark-6">1 à 5 étoiles</span>
                                     </div>
                                     @error('rating')<p class="mt-1 text-xs text-red-500">{{ $message }}</p>@enderror

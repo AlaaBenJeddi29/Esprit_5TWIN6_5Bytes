@@ -12,6 +12,7 @@ use App\Models\Incident\Incident;
 use App\Models\Infrastructure\Infrastructure;
 use App\Models\Infrastructure\Zone;
 use App\Services\DuplicateDetector;
+use App\Services\IncidentAdminNotifier;
 use App\Services\IncidentClassifier;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -27,6 +28,7 @@ class IncidentController extends Controller
     public function __construct(
         private readonly IncidentClassifier $classifier,
         private readonly DuplicateDetector $duplicateDetector,
+        private readonly IncidentAdminNotifier $adminNotifier,
     ) {}
 
     public function index(Request $request): View
@@ -114,6 +116,8 @@ class IncidentController extends Controller
                 'ai_summary' => $classification['summary'].' Doublon probable du signalement '.$duplicate->reference.'.',
             ]);
         }
+
+        $this->adminNotifier->notifyNewIncident($incident);
 
         DetectIncidentSimilarities::dispatch($incident->id);
 

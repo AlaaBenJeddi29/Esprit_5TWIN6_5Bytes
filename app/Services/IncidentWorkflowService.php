@@ -17,6 +17,10 @@ use Illuminate\Support\Facades\DB;
  */
 class IncidentWorkflowService
 {
+    public function __construct(
+        private readonly IncidentCitizenNotifier $citizenNotifier,
+    ) {}
+
     /**
      * Transitions autorisées : statut actuel => statuts cibles.
      *
@@ -85,7 +89,11 @@ class IncidentWorkflowService
         $resolutionNote = $this->normalize($resolutionNote);
         $rejectionReason = $this->normalize($rejectionReason);
 
-        return DB::transaction(function () use ($incident, $to, $actor, $comment, $resolutionNote, $rejectionReason): Incident {
+        $resolvedHistoryId = null;
+
+        $updated = DB::transaction(function () use ($incident, $to, $actor, $comment, $resolutionNote, $rejectionReason, &$resolvedHistoryId): Incident {
+            $resolvedHistoryId = null;
+
             $locked = Incident::query()
                 ->whereKey($incident->getKey())
                 ->lockForUpdate()
@@ -125,7 +133,7 @@ class IncidentWorkflowService
             $locked->status = $to;
             $locked->save();
 
-            $locked->statusHistories()->create([
+            $history = $locked->statusHistories()->create([
                 'user_id' => $actor->id,
                 'ancien_statut' => $from,
                 'nouveau_statut' => $to,
@@ -134,8 +142,18 @@ class IncidentWorkflowService
                 'rejection_reason' => $snapshotRejection,
             ]);
 
+            if ($from !== 'traite' && $to === 'traite') {
+                $resolvedHistoryId = $history->id;
+            }
+
             return $locked->refresh();
         }, 3);
+
+        if ($resolvedHistoryId !== null) {
+            $this->citizenNotifier->notifyResolved($updated, $resolvedHistoryId);
+        }
+
+        return $updated;
     }
 
     /**

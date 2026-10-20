@@ -12,6 +12,7 @@ use App\Models\Project\Project;
 use App\Models\Project\ProjectDocument;
 use App\Services\ProjectAssistant;
 use App\Services\ProjectMetrics;
+use App\Services\StripeDonationReconciler;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -26,7 +27,10 @@ class ProjectController extends Controller
 {
     use ResolvesListingFilters;
 
-    public function __construct(private readonly ProjectAssistant $assistant) {}
+    public function __construct(
+        private readonly ProjectAssistant $assistant,
+        private readonly StripeDonationReconciler $donations,
+    ) {}
 
     public function index(Request $request): View
     {
@@ -176,7 +180,7 @@ class ProjectController extends Controller
         $donation = $this->donationDuCitoyen($request, $project, $request->query('session_id'));
 
         if ($donation->statut_paiement !== Funding::PAIEMENT_PAYE) {
-            $this->confirmDonationFromStripeSession($donation);
+            $this->donations->confirmIfPaid($donation);
             $donation->refresh();
         }
 
@@ -218,83 +222,6 @@ class ProjectController extends Controller
             ->where('source', 'don')
             ->where('stripe_session_id', $sessionId)
             ->firstOrFail();
-    }
-
-    /**
-     * Revérifie la session Checkout auprès de Stripe et confirme le don si, et
-     * seulement si, toutes les preuves de paiement correspondent au don local.
-     */
-    private function confirmDonationFromStripeSession(Funding $donation): void
-    {
-        $secret = (string) config('services.stripe.secret');
-        $sessionId = (string) $donation->stripe_session_id;
-
-        // Même garde que la création : aucune clé absente ou live n'est utilisée.
-        if ($sessionId === '' || $secret === '' || str_starts_with($secret, 'sk_live_')) {
-            return;
-        }
-
-        try {
-            $session = StripeCheckoutSession::retrieve($sessionId, ['api_key' => $secret]);
-        } catch (Throwable $e) {
-            // Aucun détail Stripe n'est affiché au citoyen ; le type suffit au diagnostic.
-            Log::warning('Dons Stripe : vérification du retour de succès impossible (don '.$donation->id.') — '.get_class($e));
-
-            return;
-        }
-
-        $reason = $this->stripeSessionMismatchReason($donation, $session, $sessionId);
-
-        if ($reason !== null) {
-            Log::info('Dons Stripe : retour de succès non confirmé (don '.$donation->id.') — '.$reason);
-
-            return;
-        }
-
-        // Même mise à jour conditionnelle que le webhook : un état déjà payé
-        // n'est jamais réécrit et deux confirmations concurrentes sont sûres.
-        $updated = Funding::query()
-            ->whereKey($donation->id)
-            ->where('stripe_session_id', $sessionId)
-            ->where('statut_paiement', '!=', Funding::PAIEMENT_PAYE)
-            ->update([
-                'statut_paiement' => Funding::PAIEMENT_PAYE,
-                'date_versement' => now()->toDateString(),
-            ]);
-
-        if ($updated > 0) {
-            Log::info('Dons Stripe : don confirmé via le retour de succès.', ['donation_id' => $donation->id]);
-        }
-    }
-
-    /** Contrôles stricts : la session récupérée doit correspondre au don local. */
-    private function stripeSessionMismatchReason(Funding $donation, StripeCheckoutSession $session, string $sessionId): ?string
-    {
-        if (! hash_equals($sessionId, (string) ($session->id ?? ''))) {
-            return 'identifiant de session différent';
-        }
-
-        if ((string) ($session->payment_status ?? '') !== 'paid') {
-            return 'paiement non confirmé';
-        }
-
-        if ((int) ($session->metadata->donation_id ?? 0) !== (int) $donation->id) {
-            return 'donation_id incohérent';
-        }
-
-        if ((int) ($session->metadata->project_id ?? 0) !== (int) $donation->project_id) {
-            return 'project_id incohérent';
-        }
-
-        if ((int) ($session->amount_total ?? 0) !== (int) round((float) $donation->montant * 100)) {
-            return 'montant incohérent';
-        }
-
-        if (strtolower((string) ($session->currency ?? '')) !== strtolower((string) config('donations.currency'))) {
-            return 'devise incohérente';
-        }
-
-        return null;
     }
 
     public function downloadDocument(Project $project, ProjectDocument $document): StreamedResponse

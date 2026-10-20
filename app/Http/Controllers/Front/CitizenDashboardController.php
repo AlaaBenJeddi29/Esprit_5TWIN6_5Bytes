@@ -9,14 +9,21 @@ use App\Models\Drought\ScheduledCut;
 use App\Models\Incident\Incident;
 use App\Models\Project\Funding;
 use App\Models\Quality\WaterQualityAlert;
+use App\Services\StripeDonationReconciler;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class CitizenDashboardController extends Controller
 {
+    public function __construct(private readonly StripeDonationReconciler $donations) {}
+
     public function index(Request $request): View
     {
         $user = $request->user();
+
+        // Sans webhook relayé en local, un don payé peut rester en attente si le
+        // retour Stripe n'a pas lieu : on le revérifie à l'ouverture de l'espace.
+        $this->donations->reconcileForUser($user);
 
         $incidents = Incident::query()
             ->where('user_id', $user->id)

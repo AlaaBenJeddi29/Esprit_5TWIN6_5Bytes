@@ -54,7 +54,12 @@ class StripeWebhookController extends Controller
             'type' => (string) ($event->type ?? ''),
         ]);
 
-        if ($event->type !== 'checkout.session.completed') {
+        // Les moyens de paiement différés (SEPA, etc.) confirment d'abord la
+        // session en « unpaid », puis envoient async_payment_succeeded.
+        if (! in_array($event->type, [
+            'checkout.session.completed',
+            'checkout.session.async_payment_succeeded',
+        ], true)) {
             return response('', 200);
         }
 
