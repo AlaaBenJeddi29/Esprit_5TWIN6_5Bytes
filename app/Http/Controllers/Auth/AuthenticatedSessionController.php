@@ -25,14 +25,35 @@ class AuthenticatedSessionController extends Controller
      */
     public function store(LoginRequest $request): RedirectResponse
     {
-        $request->authenticate();
+        $request->session()->forget([
+            'two-factor.login.id',
+            'two-factor.login.remember',
+            'two-factor.login.started_at',
+        ]);
+
+        $user = $request->authenticate();
+
+        // Aucune session authentifiée n'est ouverte tant que le second
+        // facteur n'a pas été validé.
+        if ($user->hasEnabledTwoFactorAuthentication()) {
+            $request->session()->regenerate();
+            $request->session()->put([
+                'two-factor.login.id' => $user->id,
+                'two-factor.login.remember' => $request->boolean('remember'),
+                'two-factor.login.started_at' => now()->timestamp,
+            ]);
+
+            return redirect()->route('two-factor.login');
+        }
+
+        Auth::login($user, $request->boolean('remember'));
 
         $request->session()->regenerate();
 
         // Redirection selon le rôle, en s'assurant que l'URL mémorisée par
         // redirect()->intended() ne dépose pas l'utilisateur dans un espace
         // auquel son rôle ne donne pas accès.
-        return redirect()->to(RoleRedirector::for($request, $request->user()));
+        return redirect()->to(RoleRedirector::for($request, $user));
     }
 
     /**

@@ -1,6 +1,5 @@
 @php
     $user = auth()->user();
-    $initial = mb_strtoupper(mb_substr($user?->name ?? 'U', 0, 1));
 @endphp
 
 <header class="sticky top-0 z-99999 flex w-full border-gray-200 bg-white xl:border-b dark:border-gray-800 dark:bg-gray-900">
@@ -76,9 +75,12 @@
                     aria-haspopup="true"
                     :aria-expanded="open"
                 >
-                    <span class="flex h-10 w-10 items-center justify-center rounded-full bg-brand-500 text-sm font-semibold text-white">
-                        {{ $initial }}
-                    </span>
+                    <x-user-avatar
+                        :user="$user"
+                        size="h-10 w-10"
+                        text-size="text-sm"
+                        fallback-class="bg-brand-500 text-white"
+                    />
                     <span class="hidden text-left sm:block">
                         <span class="block text-sm font-medium text-gray-800 dark:text-white/90">{{ $user?->name ?? 'Utilisateur' }}</span>
                         <span class="block text-xs text-gray-500 dark:text-gray-400">{{ $user?->role?->label() ?? '—' }}</span>
@@ -100,9 +102,12 @@
                     class="absolute right-0 z-50 mt-[17px] flex w-[260px] flex-col rounded-2xl border border-gray-200 bg-white p-3 shadow-theme-lg dark:border-gray-800 dark:bg-gray-dark"
                 >
                     <div class="flex items-center gap-3 pb-3">
-                        <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand-500 text-sm font-semibold text-white">
-                            {{ $initial }}
-                        </span>
+                        <x-user-avatar
+                            :user="$user"
+                            size="h-11 w-11"
+                            text-size="text-sm"
+                            fallback-class="bg-brand-500 text-white"
+                        />
                         <div class="min-w-0">
                             <span class="block truncate font-medium text-gray-700 text-theme-sm dark:text-gray-300">{{ $user?->name }}</span>
                             <span class="mt-0.5 block truncate text-theme-xs text-gray-500 dark:text-gray-400">{{ $user?->email }}</span>

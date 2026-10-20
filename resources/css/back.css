@@ -16,6 +16,8 @@
 @source '../../storage/framework/views/*.php';
 @source '../views/back/**/*.blade.php';
 @source '../views/components/back/**/*.blade.php';
+@source '../views/profile/**/*.blade.php';
+@source '../views/components/user-avatar.blade.php';
 @source '../js/**/*.js';
 
 @custom-variant dark (&:is(.dark *));

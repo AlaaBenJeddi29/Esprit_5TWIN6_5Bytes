@@ -5,6 +5,9 @@
 
 /* Only scan Front Office Blade views and map UI script for utility classes. */
 @source '../views/front/**/*.blade.php';
+@source '../views/auth/**/*.blade.php';
+@source '../views/profile/**/*.blade.php';
+@source '../views/components/user-avatar.blade.php';
 @source '../js/zone-map.js';
 
 @theme {

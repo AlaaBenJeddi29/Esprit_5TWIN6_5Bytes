@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Enums\UserRole;
 use App\Models\Incident\Incident;
 use App\Models\Incident\IncidentFeedback;
@@ -10,12 +9,14 @@ use App\Models\Project\Funding;
 use App\Models\Project\Project;
 use App\Models\Quality\WaterQualitySample;
 use Database\Factories\UserFactory;
+use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Storage;
 
-class User extends Authenticatable
+class User extends Authenticatable implements MustVerifyEmail
 {
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
@@ -41,6 +42,8 @@ class User extends Authenticatable
     protected $hidden = [
         'password',
         'remember_token',
+        'two_factor_secret',
+        'two_factor_recovery_codes',
     ];
 
     /**
@@ -55,6 +58,9 @@ class User extends Authenticatable
             'password' => 'hashed',
             'role' => UserRole::class,
             'is_active' => 'boolean',
+            'two_factor_secret' => 'encrypted',
+            'two_factor_recovery_codes' => 'encrypted:array',
+            'two_factor_confirmed_at' => 'datetime',
         ];
     }
 
@@ -160,5 +166,25 @@ class User extends Authenticatable
     public function canAccessBackOffice(): bool
     {
         return $this->isAdmin() || $this->isGestionnaire();
+    }
+
+    /**
+     * L'authentification à deux facteurs est-elle active et confirmée ?
+     */
+    public function hasEnabledTwoFactorAuthentication(): bool
+    {
+        return $this->two_factor_confirmed_at !== null
+            && is_string($this->two_factor_secret)
+            && $this->two_factor_secret !== '';
+    }
+
+    /**
+     * URL publique de la photo de profil, ou null si aucune photo.
+     */
+    public function avatarUrl(): ?string
+    {
+        return $this->avatar_path
+            ? Storage::disk('public')->url($this->avatar_path)
+            : null;
     }
 }
