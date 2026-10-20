@@ -231,6 +231,7 @@ Route::middleware(['auth', 'verified', 'role:gestionnaire,admin'])
 
         // Gestion 4 — Sécheresse, consommation et continuité de service
         Route::get('water-levels/export/{format}', [WaterLevelController::class, 'export'])
+            ->whereIn('format', ['pdf', 'excel', 'csv'])
             ->name('water-levels.export');
         Route::resource('water-levels', WaterLevelController::class)
             ->names('water-levels')
@@ -238,6 +239,7 @@ Route::middleware(['auth', 'verified', 'role:gestionnaire,admin'])
             ->parameters(['water-levels' => 'level']);
         
         Route::get('consumption-readings/export/{format}', [ConsumptionReadingController::class, 'export'])
+            ->whereIn('format', ['pdf', 'excel', 'csv'])
             ->name('consumption-readings.export');
         Route::get('consumption-readings/previsions', [ConsumptionReadingController::class, 'forecast'])
             ->name('consumption-readings.forecast');
@@ -247,12 +249,14 @@ Route::middleware(['auth', 'verified', 'role:gestionnaire,admin'])
             ->parameters(['consumption-readings' => 'reading']);
         
         Route::get('restrictions/export/{format}', [RestrictionController::class, 'export'])
+            ->whereIn('format', ['pdf', 'excel', 'csv'])
             ->name('restrictions.export');
         Route::resource('restrictions', RestrictionController::class)
             ->names('restrictions')
             ->except(['show']);
         
         Route::get('scheduled-cuts/export/{format}', [ScheduledCutController::class, 'export'])
+            ->whereIn('format', ['pdf', 'excel', 'csv'])
             ->name('scheduled-cuts.export');
         Route::resource('scheduled-cuts', ScheduledCutController::class)
             ->names('scheduled-cuts')

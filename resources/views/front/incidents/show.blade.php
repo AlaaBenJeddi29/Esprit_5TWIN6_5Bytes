@@ -141,7 +141,7 @@
                                 </div>
                             @endif
 
-                            <form method="POST" action="{{ route('citizen.incidents.feedback.store', $incident) }}" class="mt-5 space-y-5">
+                            <form novalidate method="POST" action="{{ route('citizen.incidents.feedback.store', $incident) }}" class="mt-5 space-y-5">
                                 @csrf
 
                                 <div>
@@ -325,7 +325,7 @@
                             <p class="mt-2 text-sm text-body-color dark:text-dark-6">Aucune photo pour ce signalement.</p>
                         @endif
 
-                        <form method="POST" action="{{ route('citizen.incidents.photos.store', $incident) }}" enctype="multipart/form-data" class="mt-5 border-t border-stroke pt-4 dark:border-dark-3">
+                        <form novalidate method="POST" action="{{ route('citizen.incidents.photos.store', $incident) }}" enctype="multipart/form-data" class="mt-5 border-t border-stroke pt-4 dark:border-dark-3">
                             @csrf
                             <label for="photo" class="mb-2 block text-sm font-medium text-dark dark:text-white">Ajouter une photo</label>
                             <input type="file" id="photo" name="photo"
@@ -352,7 +352,7 @@
                             <p class="mt-2 text-sm text-body-color dark:text-dark-6">Aucun échange pour le moment.</p>
                         @endforelse
 
-                        <form method="POST" action="{{ route('citizen.incidents.comments.store', $incident) }}" class="mt-5 border-t border-stroke pt-4 dark:border-dark-3">
+                        <form novalidate method="POST" action="{{ route('citizen.incidents.comments.store', $incident) }}" class="mt-5 border-t border-stroke pt-4 dark:border-dark-3">
                             @csrf
                             <label for="body" class="mb-2 block text-sm font-medium text-dark dark:text-white">Ajouter un commentaire</label>
                             <textarea id="body" name="body" rows="3" class="{{ $inputClass }} @error('body') border-red-500 @enderror" placeholder="Précision, photo complémentaire, disponibilité…">{{ old('body') }}</textarea>

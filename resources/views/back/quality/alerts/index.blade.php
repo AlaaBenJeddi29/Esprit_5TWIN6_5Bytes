@@ -15,7 +15,7 @@
 
     <x-back.page-header title="Alertes qualité" desc="Alertes générées automatiquement lors de l'analyse des prélèvements non conformes." />
 
-    <form method="GET" class="mb-5 flex flex-wrap gap-2">
+    <form novalidate method="GET" class="mb-5 flex flex-wrap gap-2">
         <input type="search" name="search" value="{{ $search }}" placeholder="Message de l'alerte…" class="w-full max-w-xs {{ $inputClass }}">
         <select name="niveau" class="{{ $inputClass }}">
             <option value="">Tous les niveaux</option>
@@ -68,7 +68,7 @@
                         </div>
 
                         <div class="flex flex-wrap items-center gap-3">
-                            <form method="POST" action="{{ route('back.quality-alerts.update', $alert) }}" class="flex items-center gap-2">
+                            <form novalidate method="POST" action="{{ route('back.quality-alerts.update', $alert) }}" class="flex items-center gap-2">
                                 @csrf
                                 @method('PATCH')
                                 <select name="statut" class="{{ $inputClass }} !py-1.5 text-xs @error('statut') border-error-400 @enderror">

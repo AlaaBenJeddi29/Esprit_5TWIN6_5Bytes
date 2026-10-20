@@ -143,7 +143,7 @@
                 <div class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
                     <h2 class="text-base font-medium text-gray-800 dark:text-white/90">Prise en charge</h2>
                     <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Marquez la réclamation comme étant en cours d'examen.</p>
-                    <form method="POST" action="{{ route('back.complaints.review', $feedback) }}" class="mt-4">
+                    <form novalidate method="POST" action="{{ route('back.complaints.review', $feedback) }}" class="mt-4">
                         @csrf
                         @method('PATCH')
                         <button type="submit" class="w-full rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-600">Prendre en examen</button>
@@ -155,7 +155,7 @@
                 <div class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
                     <h2 class="text-base font-medium text-gray-800 dark:text-white/90">Décision</h2>
                     <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Une justification est obligatoire pour accepter ou refuser.</p>
-                    <form method="POST" action="{{ route('back.complaints.decision', $feedback) }}" class="mt-4 space-y-3">
+                    <form novalidate method="POST" action="{{ route('back.complaints.decision', $feedback) }}" class="mt-4 space-y-3">
                         @csrf
                         @method('PATCH')
 
@@ -185,7 +185,7 @@
             @if ($feedback->complaint_status !== 'cloturee')
                 <div class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
                     <h2 class="text-base font-medium text-gray-800 dark:text-white/90">Répondre au citoyen</h2>
-                    <form method="POST" action="{{ route('back.complaints.response', $feedback) }}" class="mt-4 space-y-3">
+                    <form novalidate method="POST" action="{{ route('back.complaints.response', $feedback) }}" class="mt-4 space-y-3">
                         @csrf
                         <textarea name="response" rows="4" class="{{ $inputClass }} @error('response') border-error-400 @enderror" placeholder="Votre réponse sera visible par le citoyen">{{ old('response', $feedback->manager_response) }}</textarea>
                         @error('response')<p class="mt-1 text-xs text-error-600">{{ $message }}</p>@enderror
@@ -201,7 +201,7 @@
                         <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">
                             La réouverture passe par le workflow des incidents et exige un motif. L'incident repassera au statut « En cours ».
                         </p>
-                        <form method="POST" action="{{ route('back.complaints.reopen', $feedback) }}" class="mt-4 space-y-3">
+                        <form novalidate method="POST" action="{{ route('back.complaints.reopen', $feedback) }}" class="mt-4 space-y-3">
                             @csrf
                             @method('PATCH')
                             <textarea name="justification" rows="3" class="{{ $inputClass }} @error('justification') border-error-400 @enderror" placeholder="Motif de réouverture (10 à 2000 caractères)">{{ old('justification', $feedback->decision_reason) }}</textarea>
@@ -221,7 +221,7 @@
                 <div class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
                     <h2 class="text-base font-medium text-gray-800 dark:text-white/90">Clôturer le dossier</h2>
                     <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">La clôture est définitive pour cette réclamation.</p>
-                    <form method="POST" action="{{ route('back.complaints.close', $feedback) }}" class="mt-4 space-y-3">
+                    <form novalidate method="POST" action="{{ route('back.complaints.close', $feedback) }}" class="mt-4 space-y-3">
                         @csrf
                         @method('PATCH')
                         <textarea name="justification" rows="2" class="{{ $inputClass }} @error('justification') border-error-400 @enderror" placeholder="Commentaire de clôture (facultatif)">{{ old('justification') }}</textarea>

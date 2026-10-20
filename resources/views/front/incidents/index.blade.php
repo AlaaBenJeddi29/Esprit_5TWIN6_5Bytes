@@ -21,7 +21,7 @@
                 $hasFilters = $search !== '' || $currentStatut !== '' || $currentType !== '';
             @endphp
 
-            <form method="GET" class="mb-6 flex flex-wrap gap-3">
+            <form novalidate method="GET" class="mb-6 flex flex-wrap gap-3">
                 <input type="search" name="search" value="{{ $search }}" placeholder="Référence ou objet…" class="{{ $inputClass }} max-w-xs">
                 <select name="statut" class="{{ $inputClass }} max-w-xs">
                     <option value="">Tous les statuts</option>

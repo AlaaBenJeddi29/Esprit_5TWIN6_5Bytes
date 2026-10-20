@@ -60,7 +60,7 @@
     </div>
 
     {{-- Filtres --}}
-    <form method="GET" action="{{ route('back.quality-planifications.index') }}" class="mb-6 flex flex-wrap items-end gap-3 rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-white/[0.03]">
+    <form novalidate method="GET" action="{{ route('back.quality-planifications.index') }}" class="mb-6 flex flex-wrap items-end gap-3 rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-white/[0.03]">
         <div>
             <label for="filter-zone" class="mb-1 block text-sm text-gray-500 dark:text-gray-400">Zone</label>
             <select id="filter-zone" name="zone_id" class="{{ $inputClass }}">

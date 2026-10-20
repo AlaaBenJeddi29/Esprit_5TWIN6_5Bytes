@@ -18,7 +18,7 @@
         $hasFilters = $search !== '' || $currentSpecialite !== '';
     @endphp
 
-    <form method="GET" action="{{ route('back.contractors.index') }}" class="mb-5 flex flex-wrap gap-2">
+    <form novalidate method="GET" action="{{ route('back.contractors.index') }}" class="mb-5 flex flex-wrap gap-2">
         <input type="search" name="search" value="{{ $search }}" placeholder="Nom, spécialité ou email…" class="w-full max-w-sm {{ $inputClass }}">
         <select name="specialite" class="{{ $inputClass }}">
             <option value="">Toutes les spécialités</option>

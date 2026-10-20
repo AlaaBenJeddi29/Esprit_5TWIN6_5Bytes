@@ -14,7 +14,7 @@
         </x-slot:action>
     </x-back.page-header>
 
-    <form method="GET" class="mb-5 flex flex-wrap gap-2">
+    <form novalidate method="GET" class="mb-5 flex flex-wrap gap-2">
         <select name="parametre" class="{{ $inputClass }}">
             <option value="">Tous les paramètres</option>
             @foreach ($parametres as $key => $label)

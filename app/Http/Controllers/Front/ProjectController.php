@@ -173,7 +173,7 @@ class ProjectController extends Controller
      */
     public function donationSuccess(Request $request, Project $project): View
     {
-        $donation = $this->donationDuCitoyen($request, $project, (string) $request->query('session_id', ''));
+        $donation = $this->donationDuCitoyen($request, $project, $request->query('session_id'));
 
         if ($donation->statut_paiement !== Funding::PAIEMENT_PAYE) {
             $this->confirmDonationFromStripeSession($donation);
@@ -189,7 +189,7 @@ class ProjectController extends Controller
     /** Retour Stripe après abandon : le don reste impayé et peut être retenté. */
     public function donationCancel(Request $request, Project $project): View
     {
-        $donation = $this->donationDuCitoyen($request, $project, (string) $request->query('session_id', ''));
+        $donation = $this->donationDuCitoyen($request, $project, $request->query('session_id'));
 
         if ($donation->statut_paiement === Funding::PAIEMENT_EN_ATTENTE) {
             $donation->update(['statut_paiement' => Funding::PAIEMENT_ANNULE]);
@@ -205,9 +205,12 @@ class ProjectController extends Controller
      * Un citoyen ne peut consulter que ses propres dons, sur le projet concerné
      * et rattachés à la session Stripe annoncée — sinon 404 (aucune fuite).
      */
-    private function donationDuCitoyen(Request $request, Project $project, string $sessionId): Funding
+    private function donationDuCitoyen(Request $request, Project $project, mixed $sessionId): Funding
     {
-        abort_if($sessionId === '', 404);
+        abort_unless(
+            is_string($sessionId) && $sessionId !== '' && strlen($sessionId) <= 255,
+            404
+        );
 
         return Funding::query()
             ->where('project_id', $project->id)

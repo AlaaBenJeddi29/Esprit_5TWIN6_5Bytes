@@ -15,7 +15,7 @@
         </x-slot:action>
     </x-back.page-header>
 
-    <form method="GET" class="mb-5 flex flex-wrap gap-2">
+    <form novalidate method="GET" class="mb-5 flex flex-wrap gap-2">
         <select name="zone_id" class="{{ $inputClass }}">
             <option value="">Toutes les zones</option>
             @foreach ($zones as $zone)

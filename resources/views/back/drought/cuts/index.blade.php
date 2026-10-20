@@ -21,7 +21,7 @@
         </x-slot:action>
     </x-back.page-header>
 
-    <form method="GET" class="mb-5 flex flex-wrap gap-2">
+    <form novalidate method="GET" class="mb-5 flex flex-wrap gap-2">
         <input type="search" name="search" value="{{ $search }}" placeholder="Motif de la coupure…" class="w-full max-w-xs {{ $inputClass }}">
         <select name="statut" class="{{ $inputClass }}">
             <option value="">Tous les statuts</option>

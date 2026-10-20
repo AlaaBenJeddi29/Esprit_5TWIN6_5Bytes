@@ -115,7 +115,7 @@
     {{-- =====================================================================
          BARRE DE RECHERCHE + FILTRE RISQUE
          ===================================================================== --}}
-    <form method="GET" action="{{ route('back.zones.index') }}" class="mb-5 flex flex-wrap gap-2">
+    <form novalidate method="GET" action="{{ route('back.zones.index') }}" class="mb-5 flex flex-wrap gap-2">
         <input type="search" name="search" value="{{ $search }}" placeholder="Nom, commune ou code postal…"
                class="w-full max-w-xs rounded-lg border-gray-300 bg-white text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:focus:border-brand-800">
 

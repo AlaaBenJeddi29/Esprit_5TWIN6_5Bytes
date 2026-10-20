@@ -41,4 +41,18 @@ class PasswordConfirmationTest extends TestCase
 
         $response->assertSessionHasErrors();
     }
+
+    public function test_password_confirmation_rejects_a_non_scalar_password(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)
+            ->from('/confirm-password')
+            ->post('/confirm-password', [
+                'password' => ['password'],
+            ]);
+
+        $response->assertRedirect('/confirm-password');
+        $response->assertSessionHasErrors('password');
+    }
 }

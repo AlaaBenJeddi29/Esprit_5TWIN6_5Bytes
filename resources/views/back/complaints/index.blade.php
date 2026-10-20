@@ -23,7 +23,7 @@
         </x-slot:action>
     </x-back.page-header>
 
-    <form method="GET" action="{{ route('back.complaints.index') }}" class="mb-5 flex flex-wrap gap-2">
+    <form novalidate method="GET" action="{{ route('back.complaints.index') }}" class="mb-5 flex flex-wrap gap-2">
         <input type="search" name="search" value="{{ $filters['search'] ?? '' }}" placeholder="Référence, titre ou citoyen…" class="w-full max-w-xs {{ $inputClass }}">
 
         <select name="status" class="{{ $inputClass }}">

@@ -58,7 +58,7 @@
                     </header>
 
                     @if (! $enabled)
-                        <form method="POST" action="{{ route('two-factor.setup') }}" class="mt-6 space-y-6">
+                        <form novalidate method="POST" action="{{ route('two-factor.setup') }}" class="mt-6 space-y-6">
                             @csrf
 
                             <div class="rounded-md border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
@@ -81,7 +81,7 @@
                                     {{ $recoveryCodesCount }} code(s) de secours restant(s). Ils permettent de vous connecter si vous n’avez plus accès à votre application d’authentification.
                                 </p>
 
-                                <form method="POST" action="{{ route('two-factor.recovery-codes') }}" class="mt-4 space-y-4">
+                                <form novalidate method="POST" action="{{ route('two-factor.recovery-codes') }}" class="mt-4 space-y-4">
                                     @csrf
 
                                     <div>
@@ -100,7 +100,7 @@
                                     La désactivation supprime immédiatement le secret et tous les codes de secours. Confirmez avec votre mot de passe.
                                 </p>
 
-                                <form method="POST" action="{{ route('two-factor.disable') }}" class="mt-4 space-y-4" onsubmit="return confirm('Désactiver l’authentification à deux facteurs ?');">
+                                <form novalidate method="POST" action="{{ route('two-factor.disable') }}" class="mt-4 space-y-4" onsubmit="return confirm('Désactiver l’authentification à deux facteurs ?');">
                                     @csrf
 
                                     <div>

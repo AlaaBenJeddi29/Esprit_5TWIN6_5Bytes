@@ -52,10 +52,12 @@ class QualityZoneAssignmentController extends Controller
 
     public function update(UpdateQualityZoneAssignmentsRequest $request): RedirectResponse
     {
-        $gestionnaire = User::findOrFail($request->integer('gestionnaire_id'));
+        $validated = $request->validated();
+
+        $gestionnaire = User::findOrFail($validated['gestionnaire_id']);
         abort_unless($gestionnaire->isGestionnaire(), 404);
 
-        $zoneIds = array_values(array_unique(array_map('intval', $request->input('zone_ids', []))));
+        $zoneIds = array_values(array_unique(array_map('intval', $validated['zone_ids'] ?? [])));
 
         DB::transaction(function () use ($gestionnaire, $zoneIds) {
             QualityZoneAssignment::query()->where('user_id', $gestionnaire->id)->delete();

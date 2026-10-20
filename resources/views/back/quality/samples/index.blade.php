@@ -71,7 +71,7 @@
                 <p class="mt-1 max-w-2xl text-sm text-gray-500 dark:text-gray-400">Génère un rapport contenant uniquement les prélèvements, mesures, seuils, statuts et alertes de la zone sélectionnée.</p>
             </div>
 
-            <form method="GET" action="{{ route('back.quality-samples.index') }}" class="flex flex-wrap items-end gap-2">
+            <form novalidate method="GET" action="{{ route('back.quality-samples.index') }}" class="flex flex-wrap items-end gap-2">
                 <input type="hidden" name="pdf" value="1">
 
                 <div>
@@ -109,7 +109,7 @@
                 <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Chaque périmètre est analysé séparément, uniquement à partir de ses propres prélèvements.</p>
             </div>
 
-            <form method="GET" class="flex flex-wrap items-center gap-2">
+            <form novalidate method="GET" class="flex flex-wrap items-center gap-2">
                 @if ($search !== '')
                     <input type="hidden" name="search" value="{{ $search }}">
                 @endif
@@ -232,7 +232,7 @@
         @endif
     </div>
 
-    <form method="GET" class="mb-5 flex flex-wrap gap-2">
+    <form novalidate method="GET" class="mb-5 flex flex-wrap gap-2">
         @if ($perimetre)
             <input type="hidden" name="perimetre" value="{{ $perimetre->id }}">
         @endif

@@ -17,7 +17,7 @@
         </x-slot:action>
     </x-back.page-header>
 
-    <form method="GET" action="{{ route('back.infrastructures.index') }}" class="mb-5 flex flex-wrap gap-2">
+    <form novalidate method="GET" action="{{ route('back.infrastructures.index') }}" class="mb-5 flex flex-wrap gap-2">
         <input type="search" name="search" value="{{ $search }}" placeholder="Nom ou matériau…" class="w-full max-w-xs {{ $inputClass }}">
         <select name="type" class="{{ $inputClass }}">
             <option value="">Tous les types</option>

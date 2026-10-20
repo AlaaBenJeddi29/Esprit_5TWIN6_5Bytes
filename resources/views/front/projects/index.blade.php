@@ -15,7 +15,7 @@
                 $inputClass = 'w-full rounded-md border border-stroke bg-white px-4 py-2.5 text-sm text-dark outline-none focus:border-primary dark:border-dark-3 dark:bg-dark-2 dark:text-white';
             @endphp
 
-            <form method="GET" class="mb-8 flex flex-wrap gap-3">
+            <form novalidate method="GET" class="mb-8 flex flex-wrap gap-3">
                 <input type="search" name="search" value="{{ $search }}" placeholder="Titre du projet…" class="{{ $inputClass }} max-w-xs">
                 <select name="zone_id" class="{{ $inputClass }} max-w-xs">
                     <option value="">Toutes les zones</option>

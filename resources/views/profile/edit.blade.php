@@ -142,7 +142,7 @@
                             </div>
                         </div>
 
-                        <form method="POST" action="{{ route('profile.photo.update') }}" enctype="multipart/form-data" class="space-y-4 px-6 py-6">
+                        <form novalidate method="POST" action="{{ route('profile.photo.update') }}" enctype="multipart/form-data" class="space-y-4 px-6 py-6">
                             @csrf
 
                             <div class="rounded-md border-2 border-dashed border-stroke bg-gray-1 px-5 py-6 transition hover:border-primary hover:bg-primary/5 dark:border-dark-3 dark:bg-dark-3/30 dark:hover:border-primary/60">
@@ -179,7 +179,7 @@
                         </form>
 
                         @if ($user->avatar_path)
-                            <form
+                            <form novalidate
                                 method="POST"
                                 action="{{ route('profile.photo.destroy') }}"
                                 onsubmit="return confirm('Retirer votre photo de profil ?')"
@@ -211,7 +211,7 @@
                             </div>
                         </div>
 
-                        <form method="POST" action="{{ route('profile.update') }}" class="space-y-5 px-6 py-6">
+                        <form novalidate method="POST" action="{{ route('profile.update') }}" class="space-y-5 px-6 py-6">
                             @csrf
                             @method('PATCH')
 
@@ -259,7 +259,7 @@
                                     Votre adresse e-mail n'est pas encore vérifiée. Certaines fonctionnalités restent bloquées jusqu'à la vérification.
                                 </p>
 
-                                <form method="POST" action="{{ route('verification.send') }}" class="mt-2">
+                                <form novalidate method="POST" action="{{ route('verification.send') }}" class="mt-2">
                                     @csrf
                                     <button type="submit" class="text-sm font-semibold text-yellow-700 underline hover:no-underline dark:text-yellow-400">
                                         Renvoyer l'e-mail de vérification
@@ -289,7 +289,7 @@
                             </div>
                         </div>
 
-                        <form method="POST" action="{{ route('password.update') }}" class="space-y-5 px-6 py-6">
+                        <form novalidate method="POST" action="{{ route('password.update') }}" class="space-y-5 px-6 py-6">
                             @csrf
                             @method('PUT')
 
@@ -373,7 +373,7 @@
                                     </div>
                                 @endif
 
-                                <form
+                                <form novalidate
                                     method="POST"
                                     action="{{ route('profile.destroy') }}"
                                     onsubmit="return confirm('Cette action est définitive. Confirmer la suppression de votre compte ?')"

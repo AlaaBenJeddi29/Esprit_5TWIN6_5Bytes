@@ -15,7 +15,7 @@
                 <div class="rounded-md bg-white p-6 shadow-1 dark:bg-dark-2 lg:col-span-1">
                     <h2 class="mb-4 text-lg font-bold text-dark dark:text-white">S'abonner à une zone</h2>
 
-                    <form method="POST" action="{{ route('citizen.subscriptions.store') }}" class="space-y-4">
+                    <form novalidate method="POST" action="{{ route('citizen.subscriptions.store') }}" class="space-y-4">
                         @csrf
 
                         <div>
@@ -52,7 +52,7 @@
                 <div class="rounded-md bg-white p-6 shadow-1 dark:bg-dark-2 lg:col-span-2">
                     <h2 class="mb-4 text-lg font-bold text-dark dark:text-white">Zones suivies</h2>
 
-                    <form method="GET" class="mb-4 flex flex-wrap items-center gap-2">
+                    <form novalidate method="GET" class="mb-4 flex flex-wrap items-center gap-2">
                         <select name="type_alerte" class="rounded-md border border-stroke bg-white px-3 py-2 text-sm text-dark outline-none focus:border-primary dark:border-dark-3 dark:bg-dark-2 dark:text-white">
                             <option value="">Tous les types</option>
                             @foreach ($types as $key => $label)
@@ -73,7 +73,7 @@
                                 <p class="mt-1 text-xs text-body-color dark:text-dark-6">{{ $subscription->typeLabel() }} · depuis le {{ $subscription->created_at?->format('d/m/Y') }}</p>
                             </div>
 
-                            <form method="POST" action="{{ route('citizen.subscriptions.destroy', $subscription) }}" onsubmit="return confirm('Supprimer cet abonnement ?');">
+                            <form novalidate method="POST" action="{{ route('citizen.subscriptions.destroy', $subscription) }}" onsubmit="return confirm('Supprimer cet abonnement ?');">
                                 @csrf
                                 @method('DELETE')
                                 <button type="submit" class="text-xs font-medium text-red-500 hover:underline">Se désabonner</button>

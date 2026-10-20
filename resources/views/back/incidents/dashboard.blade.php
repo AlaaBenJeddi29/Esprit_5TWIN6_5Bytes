@@ -37,7 +37,7 @@
     </x-back.page-header>
 
     {{-- Sélecteur de période --}}
-    <form
+    <form novalidate
         method="GET"
         action="{{ route('back.incidents.dashboard') }}"
         x-data="{ period: '{{ $currentPeriod }}' }"

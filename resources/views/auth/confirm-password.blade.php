@@ -21,7 +21,7 @@
                         Connecté en tant que {{ auth()->user()->email }}
                     </p>
 
-                    <form method="POST" action="{{ route('password.confirm') }}" class="text-left">
+                    <form novalidate method="POST" action="{{ route('password.confirm') }}" class="text-left">
                         @csrf
 
                         <div class="mb-[22px]">
@@ -53,7 +53,7 @@
                         </div>
                     </form>
 
-                    <form method="POST" action="{{ route('logout') }}">
+                    <form novalidate method="POST" action="{{ route('logout') }}">
                         @csrf
                         <button type="submit" class="text-sm font-medium text-primary hover:underline">
                             Se déconnecter

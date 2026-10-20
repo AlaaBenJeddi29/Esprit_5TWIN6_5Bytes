@@ -20,7 +20,7 @@
         </x-slot:action>
     </x-back.page-header>
 
-    <form method="GET" class="mb-5 flex flex-wrap gap-2">
+    <form novalidate method="GET" class="mb-5 flex flex-wrap gap-2">
         <input type="search" name="search" value="{{ $search }}" placeholder="Titre de la restriction…" class="w-full max-w-xs {{ $inputClass }}">
         <select name="type" class="{{ $inputClass }}">
             <option value="">Tous les niveaux</option>

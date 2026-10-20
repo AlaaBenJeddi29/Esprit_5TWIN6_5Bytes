@@ -125,7 +125,7 @@
                                     <a href="{{ route('profile.edit') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                                         Mon profil
                                     </a>
-                                    <form method="POST" action="{{ route('logout') }}">
+                                    <form novalidate method="POST" action="{{ route('logout') }}">
                                         @csrf
                                         <button type="submit" class="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50">
                                             Déconnexion

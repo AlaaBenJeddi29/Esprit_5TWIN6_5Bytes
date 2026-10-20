@@ -23,7 +23,7 @@
         </p>
 
         @if ($showPerPage)
-            <form method="GET" action="{{ url()->current() }}" class="flex items-center gap-2">
+            <form novalidate method="GET" action="{{ url()->current() }}" class="flex items-center gap-2">
                 @foreach ($querySansPage as $key => $value)
                     @if (is_array($value))
                         @foreach ($value as $item)

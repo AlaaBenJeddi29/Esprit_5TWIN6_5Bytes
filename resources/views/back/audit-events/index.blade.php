@@ -12,7 +12,7 @@
     <x-back.page-header title="Journal d’audit"
         desc="Historique en insertion seule des créations, modifications et suppressions de la Gestion 5." />
 
-    <form method="GET" action="{{ route('back.audit-events.index') }}" class="mb-5 flex flex-wrap gap-2">
+    <form novalidate method="GET" action="{{ route('back.audit-events.index') }}" class="mb-5 flex flex-wrap gap-2">
         @if ($project)
             <input type="hidden" name="project_id" value="{{ $project->id }}">
         @endif

@@ -10,7 +10,7 @@
 
     <x-back.page-header title="Abonnements aux alertes" desc="Consulter les citoyens abonnés aux alertes par zone. Les abonnements sont gérés par les citoyens eux-mêmes." />
 
-    <form method="GET" class="mb-5 flex flex-wrap gap-2">
+    <form novalidate method="GET" class="mb-5 flex flex-wrap gap-2">
         <input type="search" name="search" value="{{ $search }}" placeholder="Nom ou email du citoyen…" class="w-full max-w-xs {{ $inputClass }}">
         <select name="type_alerte" class="{{ $inputClass }}">
             <option value="">Tous les types</option>

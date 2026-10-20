@@ -22,7 +22,7 @@
         $hasFilters = $search !== '' || $currentActif !== '';
     @endphp
 
-    <form method="GET" action="{{ route('back.gestionnaires.index') }}" class="mb-4 flex flex-wrap gap-2">
+    <form novalidate method="GET" action="{{ route('back.gestionnaires.index') }}" class="mb-4 flex flex-wrap gap-2">
         <input
             type="search"
             name="search"
@@ -77,7 +77,7 @@
                                         <a href="{{ route('back.gestionnaires.edit', $gestionnaire) }}" class="text-xs font-medium text-brand-500 hover:underline dark:text-brand-400">
                                             Modifier
                                         </a>
-                                        <form method="POST" action="{{ route('back.gestionnaires.toggle', $gestionnaire) }}">
+                                        <form novalidate method="POST" action="{{ route('back.gestionnaires.toggle', $gestionnaire) }}">
                                             @csrf
                                             @method('PATCH')
                                             <button type="submit" class="text-xs font-medium text-gray-500 hover:underline dark:text-gray-400">

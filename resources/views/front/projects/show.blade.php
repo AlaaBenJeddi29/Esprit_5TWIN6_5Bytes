@@ -131,7 +131,7 @@
                             </div>
                         @endif
 
-                        <form method="POST" action="{{ route('public.projects.assistant', $project) }}" class="mt-4">
+                        <form novalidate method="POST" action="{{ route('public.projects.assistant', $project) }}" class="mt-4">
                             @csrf
                             <label for="question" class="mb-2 block text-sm font-medium text-dark dark:text-white">Posez une question</label>
                             <textarea id="question" name="question" rows="2"
@@ -201,7 +201,7 @@
                             </p>
 
                             @if (auth()->check() && auth()->user()->isCitoyen())
-                                <form method="POST" action="{{ route('citizen.projects.donate', $project) }}" class="mt-4">
+                                <form novalidate method="POST" action="{{ route('citizen.projects.donate', $project) }}" class="mt-4">
                                     @csrf
                                     <label for="montant" class="mb-2 block text-sm font-medium text-dark dark:text-white">Montant (€)</label>
                                     <input type="text" id="montant" name="montant" value="{{ old('montant') }}" inputmode="decimal"

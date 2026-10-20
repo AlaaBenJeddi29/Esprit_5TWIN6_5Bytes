@@ -50,7 +50,7 @@
                     </div>
                 </div>
 
-                <form method="POST" action="{{ route('profile.update') }}" class="px-5 py-5 md:px-6">
+                <form novalidate method="POST" action="{{ route('profile.update') }}" class="px-5 py-5 md:px-6">
                     @csrf
                     @method('PATCH')
 
@@ -102,7 +102,7 @@
                             Votre adresse e-mail n'est pas encore vérifiée. Certaines fonctionnalités restent bloquées jusqu'à la vérification.
                         </p>
 
-                        <form method="POST" action="{{ route('verification.send') }}" class="mt-2">
+                        <form novalidate method="POST" action="{{ route('verification.send') }}" class="mt-2">
                             @csrf
                             <button type="submit" class="text-sm font-semibold text-warning-700 underline hover:no-underline dark:text-warning-400">
                                 Renvoyer l'e-mail de vérification
@@ -126,7 +126,7 @@
                     </div>
                 </div>
 
-                <form method="POST" action="{{ route('password.update') }}" class="px-5 py-5 md:px-6">
+                <form novalidate method="POST" action="{{ route('password.update') }}" class="px-5 py-5 md:px-6">
                     @csrf
                     @method('PUT')
 
@@ -252,7 +252,7 @@
                                 </p>
                             @endif
 
-                            <form method="POST" action="{{ route('profile.destroy') }}" class="mt-5">
+                            <form novalidate method="POST" action="{{ route('profile.destroy') }}" class="mt-5">
                                 @csrf
                                 @method('DELETE')
 
@@ -356,7 +356,7 @@
                     </div>
                 </div>
 
-                <form method="POST" action="{{ route('profile.photo.update') }}" enctype="multipart/form-data" class="space-y-3 px-5 py-5 md:px-6">
+                <form novalidate method="POST" action="{{ route('profile.photo.update') }}" enctype="multipart/form-data" class="space-y-3 px-5 py-5 md:px-6">
                     @csrf
 
                     <div class="rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 px-4 py-5 transition hover:border-brand-400 hover:bg-brand-25 dark:border-gray-700 dark:bg-gray-800/40 dark:hover:border-brand-500/60 dark:hover:bg-brand-500/5">
@@ -389,7 +389,7 @@
                 </form>
 
                 @if ($user->avatar_path)
-                    <form
+                    <form novalidate
                         method="POST"
                         action="{{ route('profile.photo.destroy') }}"
                         onsubmit="return confirm('Retirer votre photo de profil ?')"

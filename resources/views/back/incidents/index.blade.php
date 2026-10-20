@@ -27,7 +27,7 @@
         </x-slot:action>
     </x-back.page-header>
 
-    <form method="GET" action="{{ route('back.incidents.index') }}" class="mb-5 flex flex-wrap gap-2">
+    <form novalidate method="GET" action="{{ route('back.incidents.index') }}" class="mb-5 flex flex-wrap gap-2">
         <input type="search" name="search" value="{{ $search }}" placeholder="Référence, titre ou adresse…" class="w-full max-w-xs {{ $inputClass }}">
         <select name="status" class="{{ $inputClass }}">
             <option value="">Tous les statuts</option>

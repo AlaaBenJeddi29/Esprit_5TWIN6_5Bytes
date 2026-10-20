@@ -18,7 +18,7 @@
                     $inputClass = 'w-full rounded-md border border-stroke bg-transparent px-5 py-3 text-sm text-dark outline-none focus:border-primary dark:border-dark-3 dark:text-white';
                 @endphp
 
-                <form method="POST" action="{{ route('citizen.incidents.store') }}" class="rounded-md bg-white p-6 shadow-1 dark:bg-dark-2 md:p-8">
+                <form novalidate method="POST" action="{{ route('citizen.incidents.store') }}" class="rounded-md bg-white p-6 shadow-1 dark:bg-dark-2 md:p-8">
                     @csrf
 
                     <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
