@@ -8,7 +8,7 @@ class StoreIncidentPhotoRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user() !== null;
+        return (bool) $this->user()?->isCitoyen();
     }
 
     /**

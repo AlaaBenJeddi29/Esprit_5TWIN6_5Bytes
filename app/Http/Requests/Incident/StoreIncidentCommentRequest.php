@@ -8,7 +8,10 @@ class StoreIncidentCommentRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user() !== null;
+        $user = $this->user();
+
+        // Requête partagée Front (citoyen propriétaire) / Back (gestionnaire).
+        return $user !== null && ($user->isCitoyen() || $user->canAccessBackOffice());
     }
 
     /**
