@@ -35,6 +35,7 @@ class UserProfileTest extends TestCase
         $this->post('/profile/photo', ['photo' => $this->png()])
             ->assertRedirect(route('login'));
 
+        $this->get('/profile/avatar/1')->assertRedirect(route('login'));
         $this->delete('/profile/photo')->assertRedirect(route('login'));
         $this->delete('/profile', ['password' => 'password'])->assertRedirect(route('login'));
     }
@@ -175,7 +176,24 @@ class UserProfileTest extends TestCase
         $this->actingAs($user)
             ->get('/profile')
             ->assertOk()
-            ->assertSee(Storage::disk('public')->url($path));
+            ->assertSee(route('profile.photo.show', [
+                'user' => $user,
+                'v' => basename($path),
+            ]));
+
+        $this->actingAs($user)
+            ->get(route('profile.photo.show', $user))
+            ->assertOk()
+            ->assertHeader('content-type', 'image/png');
+    }
+
+    public function test_avatar_route_returns_not_found_when_user_has_no_photo(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->get(route('profile.photo.show', $user))
+            ->assertNotFound();
     }
 
     public function test_non_image_content_is_rejected_and_nothing_is_stored(): void

@@ -14,7 +14,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Illuminate\Support\Facades\Storage;
 
 class User extends Authenticatable implements MustVerifyEmail
 {
@@ -183,8 +182,15 @@ class User extends Authenticatable implements MustVerifyEmail
      */
     public function avatarUrl(): ?string
     {
-        return $this->avatar_path
-            ? Storage::disk('public')->url($this->avatar_path)
-            : null;
+        if (! $this->avatar_path) {
+            return null;
+        }
+
+        // La version (nom du fichier) invalide le cache du navigateur
+        // lorsque l'utilisateur remplace sa photo.
+        return route('profile.photo.show', [
+            'user' => $this,
+            'v' => basename($this->avatar_path),
+        ]);
     }
 }

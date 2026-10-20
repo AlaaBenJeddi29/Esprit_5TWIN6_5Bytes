@@ -23,10 +23,14 @@ class SendSubscriptionConfirmationJob implements ShouldQueue
 
     public function handle(): void
     {
-        // Load the subscription with related user and zone
-        $subscription = AlertSubscription::with('user', 'zone')->findOrFail($this->subscriptionId);
+        // L'abonnement a pu être supprimé avant le traitement du job :
+        // il n'y a alors plus rien à envoyer.
+        $subscription = AlertSubscription::with('user', 'zone')->find($this->subscriptionId);
 
-        // Send the subscription confirmation email
+        if ($subscription === null) {
+            return;
+        }
+
         Mail::to($subscription->user->email)->send(new SubscriptionConfirmationMail($subscription));
     }
 }

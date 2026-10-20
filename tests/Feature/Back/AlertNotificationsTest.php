@@ -55,6 +55,15 @@ class AlertNotificationsTest extends TestCase
         });
     }
 
+    public function test_confirmation_job_is_skipped_when_subscription_no_longer_exists(): void
+    {
+        Mail::fake();
+
+        (new SendSubscriptionConfirmationJob(PHP_INT_MAX))->handle();
+
+        Mail::assertNothingSent();
+    }
+
     public function test_creating_quality_drought_alerts_dispatches_the_correct_notifications(): void
     {
         Queue::fake();
