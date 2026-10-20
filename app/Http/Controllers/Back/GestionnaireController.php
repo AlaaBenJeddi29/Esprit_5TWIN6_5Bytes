@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Back;
 
 use App\Enums\UserRole;
+use App\Http\Controllers\Concerns\ResolvesListingFilters;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreGestionnaireRequest;
 use App\Http\Requests\UpdateGestionnaireRequest;
@@ -19,9 +20,13 @@ use Illuminate\View\View;
  */
 class GestionnaireController extends Controller
 {
+    use ResolvesListingFilters;
+
     public function index(Request $request): View
     {
         $search = $request->string('search')->toString();
+        $actif = $request->string('actif')->toString();
+        $perPage = $this->listingPerPage($request, 10);
 
         $gestionnaires = User::query()
             ->where('role', UserRole::Gestionnaire->value)
@@ -31,13 +36,16 @@ class GestionnaireController extends Controller
                         ->orWhere('email', 'like', "%{$search}%");
                 });
             })
+            ->when(in_array($actif, ['1', '0'], true), fn ($query) => $query->where('is_active', $actif === '1'))
             ->orderBy('name')
-            ->paginate(10)
+            ->paginate($perPage)
             ->withQueryString();
 
         return view('back.gestionnaires.index', [
             'gestionnaires' => $gestionnaires,
             'search' => $search,
+            'currentActif' => $actif,
+            'perPage' => $perPage,
         ]);
     }
 

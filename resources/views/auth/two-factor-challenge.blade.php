@@ -41,7 +41,7 @@
                         </div>
                     @endif
 
-                    <form method="POST" action="{{ route('two-factor.login.store') }}" class="text-left">
+                    <form novalidate method="POST" action="{{ route('two-factor.login.store') }}" class="text-left">
                         @csrf
 
                         <div class="mb-[22px]">
@@ -80,7 +80,7 @@
                             Utiliser un code de secours
                         </summary>
 
-                        <form method="POST" action="{{ route('two-factor.login.store') }}" class="mt-4">
+                        <form novalidate method="POST" action="{{ route('two-factor.login.store') }}" class="mt-4">
                             @csrf
 
                             <label for="recovery_code" class="mb-2 block text-sm font-medium text-dark dark:text-white">
@@ -111,7 +111,7 @@
                         </form>
                     </details>
 
-                    <form method="POST" action="{{ route('two-factor.login.cancel') }}" class="mt-8">
+                    <form novalidate method="POST" action="{{ route('two-factor.login.cancel') }}" class="mt-8">
                         @csrf
                         <button type="submit" class="text-sm font-medium text-body-color hover:text-primary dark:text-dark-6">
                             Annuler et revenir à la connexion

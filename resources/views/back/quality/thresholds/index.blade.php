@@ -5,6 +5,7 @@
 @section('content')
     @php
         $inputClass = 'rounded-lg border-gray-300 bg-white text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90';
+        $hasFilters = $currentParametre !== '' || $currentZone !== null || $currentActif !== '';
     @endphp
 
     <x-back.page-header title="Seuils de qualité" desc="Bornes réglementaires utilisées pour analyser les prélèvements (globales ou par zone).">
@@ -13,15 +14,29 @@
         </x-slot:action>
     </x-back.page-header>
 
-    <form method="GET" class="mb-5 flex flex-wrap gap-2">
+    <form novalidate method="GET" class="mb-5 flex flex-wrap gap-2">
+        <select name="parametre" class="{{ $inputClass }}">
+            <option value="">Tous les paramètres</option>
+            @foreach ($parametres as $key => $label)
+                <option value="{{ $key }}" @selected($currentParametre === $key)>{{ $label }}</option>
+            @endforeach
+        </select>
         <select name="zone_id" class="{{ $inputClass }}">
             <option value="">Toutes les zones</option>
             @foreach ($zones as $zone)
                 <option value="{{ $zone->id }}" @selected($currentZone === $zone->id)>{{ $zone->nom }}</option>
             @endforeach
         </select>
+        <select name="actif" class="{{ $inputClass }}">
+            <option value="">Tous les états</option>
+            <option value="1" @selected($currentActif === '1')>Actif</option>
+            <option value="0" @selected($currentActif === '0')>Inactif</option>
+        </select>
+        <input type="hidden" name="per_page" value="{{ $perPage }}">
         <button type="submit" class="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">Filtrer</button>
-    </form>
+        @if ($hasFilters)
+            <a href="{{ route('back.quality-thresholds.index') }}" class="inline-flex items-center px-2 text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300">Réinitialiser</a>
+        @endif    </form>
 
     <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
         @if ($thresholds->isNotEmpty())
@@ -58,10 +73,10 @@
                     </tbody>
                 </table>
             </div>
-            <div class="border-t border-gray-100 px-5 py-4 dark:border-gray-800">{{ $thresholds->links() }}</div>
+            <x-back.pagination :paginator="$thresholds" label="seuils" />
         @else
             <div class="p-5">
-                <x-back.empty-state title="Aucun seuil" message="Les seuils globaux par défaut restent appliqués tant qu'aucun seuil n'est configuré." />
+                <x-back.empty-state title="Aucun seuil" :message="$hasFilters ? 'Aucun seuil ne correspond aux filtres sélectionnés.' : 'Les seuils globaux par défaut restent appliqués tant qu\'aucun seuil n\'est configuré.'" />
             </div>
         @endif
     </div>

@@ -417,6 +417,112 @@ class ProjectModuleTest extends TestCase
         $this->actingAs($gestionnaire)->get(route('back.projects.show', $project))->assertOk();
     }
 
+    public function test_project_detail_paginates_each_section_independently(): void
+    {
+        $gestionnaire = User::factory()->gestionnaire()->create();
+        $project = Project::factory()->create();
+        $lastPhase = null;
+
+        foreach (range(1, 16) as $i) {
+            $lastPhase = ProjectPhase::factory()->create([
+                'project_id' => $project->id,
+                'nom' => sprintf('Phase test %02d', $i),
+            ]);
+            Funding::factory()->municipal()->create([
+                'project_id' => $project->id,
+                'montant' => 1000 + $i,
+            ]);
+            ProjectDocument::factory()->create([
+                'project_id' => $project->id,
+                'titre' => sprintf('Document test %02d', $i),
+            ]);
+        }
+
+        $this->actingAs($gestionnaire)
+            ->get(route('back.projects.show', ['project' => $project, 'phases_page' => 2]))
+            ->assertOk()
+            ->assertSee('Phases (16)')
+            ->assertSee('Financements (16)')
+            ->assertSee('Documents (16)')
+            ->assertSee('16–16')
+            ->assertSee('sur 16 phases')
+            ->assertSee('sur 16 financements')
+            ->assertSee('sur 16 documents')
+            ->assertSee('Phase test 16')
+            ->assertDontSee('Phase test 01')
+            ->assertSee('1 001,00')
+            ->assertDontSee('1 016,00')
+            ->assertSee('Document test 01')
+            ->assertDontSee('Document test 16')
+            ->assertSee(route('back.projects.phases.edit', [$project, $lastPhase]), false);
+
+        $this->actingAs($gestionnaire)
+            ->get(route('back.projects.show', [
+                'project' => $project,
+                'phases_page' => 2,
+                'fundings_page' => 2,
+                'documents_page' => 2,
+            ]))
+            ->assertOk()
+            ->assertSee('Phase test 16')
+            ->assertSee('1 016,00')
+            ->assertSee('Document test 16')
+            ->assertDontSee('Phase test 01')
+            ->assertDontSee('Document test 01');
+    }
+
+    public function test_out_of_range_section_page_redirects_to_last_valid_page(): void
+    {
+        $gestionnaire = User::factory()->gestionnaire()->create();
+        $project = Project::factory()->create();
+
+        ProjectPhase::factory()->create(['project_id' => $project->id, 'nom' => 'Phase première']);
+        Funding::factory()->municipal()->create(['project_id' => $project->id]);
+
+        foreach (range(1, 15) as $i) {
+            ProjectPhase::factory()->create(['project_id' => $project->id]);
+            Funding::factory()->municipal()->create(['project_id' => $project->id]);
+        }
+
+        $response = $this->actingAs($gestionnaire)
+            ->get(route('back.projects.show', [
+                'project' => $project,
+                'phases_page' => 99,
+                'fundings_page' => 2,
+            ]));
+
+        $response->assertRedirect();
+
+        $location = (string) $response->headers->get('Location');
+        parse_str((string) parse_url($location, PHP_URL_QUERY), $query);
+
+        $this->assertSame(
+            parse_url(route('back.projects.show', $project), PHP_URL_PATH),
+            parse_url($location, PHP_URL_PATH)
+        );
+        $this->assertSame('2', (string) $query['phases_page']);
+        $this->assertSame('2', (string) $query['fundings_page']);
+
+        $this->actingAs($gestionnaire)
+            ->get(route('back.projects.show', ['project' => $project, 'phases_page' => 'invalide']))
+            ->assertOk()
+            ->assertSee('Phase première');
+    }
+
+    public function test_project_detail_empty_sections_render_without_pagination(): void
+    {
+        $gestionnaire = User::factory()->gestionnaire()->create();
+        $project = Project::factory()->create();
+
+        $this->actingAs($gestionnaire)
+            ->get(route('back.projects.show', $project))
+            ->assertOk()
+            ->assertSee('Aucune phase')
+            ->assertSee('Aucun financement')
+            ->assertSee('Aucun document')
+            ->assertDontSee('Aucun résultat');
+    }
+
     public function test_project_can_be_linked_to_an_infrastructure(): void
     {
         $gestionnaire = User::factory()->gestionnaire()->create();

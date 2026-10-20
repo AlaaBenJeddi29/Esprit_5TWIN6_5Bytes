@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Back;
 
+use App\Http\Controllers\Concerns\ResolvesListingFilters;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Quality\StoreQualityThresholdRequest;
 use App\Http\Requests\Quality\UpdateQualityThresholdRequest;
@@ -13,21 +14,32 @@ use Illuminate\View\View;
 
 class QualityThresholdController extends Controller
 {
+    use ResolvesListingFilters;
+
     public function index(Request $request): View
     {
         $zoneId = $request->integer('zone_id');
+        $parametre = $request->string('parametre')->toString();
+        $actif = $request->string('actif')->toString();
+        $perPage = $this->listingPerPage($request);
 
         $thresholds = QualityThreshold::query()
             ->with('zone')
             ->when($zoneId, fn ($query) => $query->where('zone_id', $zoneId))
+            ->when(array_key_exists($parametre, QualityThreshold::PARAMETRES), fn ($query) => $query->where('parametre', $parametre))
+            ->when(in_array($actif, ['1', '0'], true), fn ($query) => $query->where('actif', $actif === '1'))
             ->orderBy('parametre')
-            ->paginate(20)
+            ->paginate($perPage)
             ->withQueryString();
 
         return view('back.quality.thresholds.index', [
             'thresholds' => $thresholds,
             'zones' => Zone::orderBy('nom')->get(),
+            'parametres' => QualityThreshold::PARAMETRES,
             'currentZone' => $zoneId ?: null,
+            'currentParametre' => $parametre,
+            'currentActif' => $actif,
+            'perPage' => $perPage,
         ]);
     }
 

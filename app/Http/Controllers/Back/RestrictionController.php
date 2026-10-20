@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Back;
 
 use App\Exports\Drought\RestrictionExport;
+use App\Http\Controllers\Concerns\ResolvesListingFilters;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Drought\StoreRestrictionRequest;
 use App\Http\Requests\Drought\UpdateRestrictionRequest;
@@ -18,19 +19,27 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class RestrictionController extends Controller
 {
+    use ResolvesListingFilters;
+
     public function index(Request $request): View
     {
+        $search = $request->string('search')->toString();
         $zoneId = $request->integer('zone_id');
         $statut = $request->string('statut')->toString();
         $type = $request->string('type')->toString();
+        ['from' => $from, 'to' => $to] = $this->listingDateRange($request);
+        $perPage = $this->listingPerPage($request);
 
         $restrictions = Restriction::query()
             ->with('zone')
+            ->when($search !== '', fn ($query) => $query->where('titre', 'like', "%{$search}%"))
             ->when($zoneId, fn ($query) => $query->where('zone_id', $zoneId))
             ->when(array_key_exists($statut, Restriction::STATUTS), fn ($query) => $query->where('statut', $statut))
             ->when(array_key_exists($type, Restriction::TYPES), fn ($query) => $query->where('type', $type))
+            ->when($from !== null, fn ($query) => $query->whereDate('date_debut', '>=', $from))
+            ->when($to !== null, fn ($query) => $query->whereDate('date_debut', '<=', $to))
             ->latest('date_debut')
-            ->paginate(15)
+            ->paginate($perPage)
             ->withQueryString();
 
         return view('back.drought.restrictions.index', [
@@ -38,9 +47,13 @@ class RestrictionController extends Controller
             'zones' => Zone::orderBy('nom')->get(),
             'types' => Restriction::TYPES,
             'statuts' => Restriction::STATUTS,
+            'search' => $search,
             'currentZone' => $zoneId ?: null,
             'currentStatut' => $statut,
             'currentType' => $type,
+            'from' => $from,
+            'to' => $to,
+            'perPage' => $perPage,
         ]);
     }
 

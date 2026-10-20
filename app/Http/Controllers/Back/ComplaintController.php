@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Back;
 
 use App\Exceptions\InvalidComplaintTransitionException;
 use App\Exceptions\InvalidIncidentTransitionException;
+use App\Http\Controllers\Concerns\ResolvesListingFilters;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Feedback\CloseComplaintRequest;
 use App\Http\Requests\Feedback\ComplaintDecisionRequest;
@@ -32,6 +33,8 @@ use Illuminate\View\View;
 
 class ComplaintController extends Controller
 {
+    use ResolvesListingFilters;
+
     public function __construct(
         private readonly ComplaintWorkflowService $complaints,
         private readonly IncidentWorkflowService $incidentWorkflow,
@@ -43,6 +46,7 @@ class ComplaintController extends Controller
     {
         $data = $request->validated();
         $search = trim((string) ($data['search'] ?? ''));
+        $perPage = $this->listingPerPage($request);
 
         $feedbacks = IncidentFeedback::query()
             ->whereNotNull('complaint_status')
@@ -84,7 +88,7 @@ class ComplaintController extends Controller
             )
             ->latest('created_at')
             ->latest('id')
-            ->paginate(15)
+            ->paginate($perPage)
             ->withQueryString();
 
         return view('back.complaints.index', [
@@ -92,6 +96,7 @@ class ComplaintController extends Controller
             'statuses' => IncidentFeedback::COMPLAINT_STATUSES,
             'zones' => Zone::orderBy('nom')->get(),
             'filters' => $data,
+            'perPage' => $perPage,
         ]);
     }
 

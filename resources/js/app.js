@@ -15,3 +15,11 @@ if (document.querySelector('[data-zone-map]')) {
 if (document.querySelector('[data-incident-map]')) {
     import('./incident-map');
 }
+
+if (document.querySelector('[data-dashboard-charts]')) {
+    import('./dashboard-charts').then(({ initDashboardCharts }) => initDashboardCharts());
+}
+
+if (document.querySelector('[data-incident-assist]')) {
+    import('./incident-assist');
+}

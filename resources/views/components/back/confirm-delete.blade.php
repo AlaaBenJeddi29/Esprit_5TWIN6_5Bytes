@@ -44,7 +44,7 @@
                     >
                         Annuler
                     </button>
-                    <form method="POST" action="{{ $action }}">
+                    <form novalidate method="POST" action="{{ $action }}">
                         @csrf
                         @method('DELETE')
                         <button

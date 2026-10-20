@@ -27,7 +27,7 @@
                     @endif
 
                     <div class="flex flex-col items-stretch gap-4">
-                        <form method="POST" action="{{ route('verification.send') }}">
+                        <form novalidate method="POST" action="{{ route('verification.send') }}">
                             @csrf
                             <button
                                 type="submit"
@@ -37,7 +37,7 @@
                             </button>
                         </form>
 
-                        <form method="POST" action="{{ route('logout') }}">
+                        <form novalidate method="POST" action="{{ route('logout') }}">
                             @csrf
                             <button type="submit" class="text-sm font-medium text-primary hover:underline">
                                 Se déconnecter

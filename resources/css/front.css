@@ -71,6 +71,16 @@
   }
 }
 
+/* Fill every star up to the selected rating; the first rule is the no-:has fallback. */
+.rating-stars input:checked + .rating-star,
+.rating-stars:has(input[value="1"]:checked) label:nth-of-type(-n + 1) .rating-star,
+.rating-stars:has(input[value="2"]:checked) label:nth-of-type(-n + 2) .rating-star,
+.rating-stars:has(input[value="3"]:checked) label:nth-of-type(-n + 3) .rating-star,
+.rating-stars:has(input[value="4"]:checked) label:nth-of-type(-n + 4) .rating-star,
+.rating-stars:has(input[value="5"]:checked) label:nth-of-type(-n + 5) .rating-star {
+  @apply text-yellow-400;
+}
+
 .sticky {
   @apply fixed transition z-9999 bg-white/80 dark:bg-dark/80;
   backdrop-filter: blur(5px);

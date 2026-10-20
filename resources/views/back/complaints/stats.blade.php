@@ -27,7 +27,7 @@
     </x-back.page-header>
 
     {{-- Période --}}
-    <form
+    <form novalidate
         method="GET"
         action="{{ route('back.complaints.stats') }}"
         x-data="{ period: '{{ $currentPeriod }}' }"

@@ -6,7 +6,7 @@
     $inputClass = 'mt-1 block w-full rounded-lg border-gray-300 bg-transparent text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:text-white/90 dark:focus:border-brand-800';
 @endphp
 
-<form method="POST" action="{{ $action }}" class="space-y-5">
+<form novalidate method="POST" action="{{ $action }}" class="space-y-5">
     @csrf
     @if ($method === 'PUT')
         @method('PUT')

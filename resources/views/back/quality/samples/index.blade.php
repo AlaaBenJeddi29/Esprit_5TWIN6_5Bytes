@@ -15,6 +15,7 @@
             'avertissement' => 'bg-warning-50 text-warning-600 dark:bg-warning-500/15 dark:text-warning-400',
             default => 'bg-blue-light-50 text-blue-light-600 dark:bg-blue-light-500/15 dark:text-blue-light-400',
         };
+        $hasFilters = $search !== '' || $currentStatut !== '' || $currentZone !== null || $currentInfrastructure !== null || $from !== null || $to !== null;
     @endphp
 
     <x-back.page-header title="Prélèvements qualité" desc="Analyses de l'eau distribuée, conformité et alertes générées.">
@@ -70,7 +71,7 @@
                 <p class="mt-1 max-w-2xl text-sm text-gray-500 dark:text-gray-400">Génère un rapport contenant uniquement les prélèvements, mesures, seuils, statuts et alertes de la zone sélectionnée.</p>
             </div>
 
-            <form method="GET" action="{{ route('back.quality-samples.index') }}" class="flex flex-wrap items-end gap-2">
+            <form novalidate method="GET" action="{{ route('back.quality-samples.index') }}" class="flex flex-wrap items-end gap-2">
                 <input type="hidden" name="pdf" value="1">
 
                 <div>
@@ -108,7 +109,7 @@
                 <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Chaque périmètre est analysé séparément, uniquement à partir de ses propres prélèvements.</p>
             </div>
 
-            <form method="GET" class="flex flex-wrap items-center gap-2">
+            <form novalidate method="GET" class="flex flex-wrap items-center gap-2">
                 @if ($search !== '')
                     <input type="hidden" name="search" value="{{ $search }}">
                 @endif
@@ -231,7 +232,7 @@
         @endif
     </div>
 
-    <form method="GET" class="mb-5 flex flex-wrap gap-2">
+    <form novalidate method="GET" class="mb-5 flex flex-wrap gap-2">
         @if ($perimetre)
             <input type="hidden" name="perimetre" value="{{ $perimetre->id }}">
         @endif
@@ -248,7 +249,19 @@
                 <option value="{{ $zone->id }}" @selected($currentZone === $zone->id)>{{ $zone->nom }}</option>
             @endforeach
         </select>
+        <select name="infrastructure_id" class="{{ $inputClass }}">
+            <option value="">Toutes les infrastructures</option>
+            @foreach ($infrastructures as $infrastructure)
+                <option value="{{ $infrastructure->id }}" @selected($currentInfrastructure === $infrastructure->id)>{{ $infrastructure->nom }}</option>
+            @endforeach
+        </select>
+        <input type="date" name="from" value="{{ $from }}" aria-label="Prélevé du" class="{{ $inputClass }}">
+        <input type="date" name="to" value="{{ $to }}" aria-label="Prélevé au" class="{{ $inputClass }}">
+        <input type="hidden" name="per_page" value="{{ $perPage }}">
         <button type="submit" class="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">Filtrer</button>
+        @if ($hasFilters)
+            <a href="{{ route('back.quality-samples.index', $perimetre ? ['perimetre' => $perimetre->id] : []) }}" class="inline-flex items-center px-2 text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300">Réinitialiser</a>
+        @endif
     </form>
 
     <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
@@ -289,10 +302,10 @@
                     </tbody>
                 </table>
             </div>
-            <div class="border-t border-gray-100 px-5 py-4 dark:border-gray-800">{{ $samples->links() }}</div>
+            <x-back.pagination :paginator="$samples" label="prélèvements" />
         @else
             <div class="p-5">
-                <x-back.empty-state title="Aucun prélèvement" message="Créez un premier prélèvement pour analyser la qualité de l'eau." />
+                <x-back.empty-state title="Aucun prélèvement" :message="$hasFilters ? 'Aucun prélèvement ne correspond aux filtres sélectionnés.' : 'Créez un premier prélèvement pour analyser la qualité de l\'eau.'" />
             </div>
         @endif
     </div>

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Back;
 
+use App\Http\Controllers\Concerns\ResolvesListingFilters;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Quality\StoreQualityPlanificationRequest;
 use App\Http\Requests\Quality\UpdateQualityPlanificationRequest;
@@ -16,6 +17,8 @@ use Throwable;
 
 class QualityPlanificationController extends Controller
 {
+    use ResolvesListingFilters;
+
     public function __construct(private readonly QualityPlanningService $planning)
     {
     }
@@ -32,17 +35,21 @@ class QualityPlanificationController extends Controller
 
         $statut = $request->string('statut')->toString();
         $statut = array_key_exists($statut, QualityPlanification::STATUTS) ? $statut : '';
+        $frequence = $request->string('frequence')->toString();
+        $frequence = array_key_exists($frequence, QualityPlanification::FREQUENCES) ? $frequence : '';
         $date = $this->parseDate($request->string('date')->toString());
+        $perPage = $this->listingPerPage($request);
 
         $planifications = QualityPlanification::query()
             ->accessibleTo($user)
             ->with(['zone', 'sample', 'creator'])
             ->when($zoneId, fn ($query) => $query->where('zone_id', $zoneId))
             ->when($statut !== '', fn ($query) => $query->withStatut($statut))
+            ->when($frequence !== '', fn ($query) => $query->where('frequence', $frequence))
             ->when($date, fn ($query) => $query->whereDate('date_prevue', $date))
             ->orderBy('date_prevue')
             ->orderBy('id')
-            ->paginate(20)
+            ->paginate($perPage)
             ->withQueryString();
 
         return view('back.quality.planifications.index', [
@@ -52,7 +59,9 @@ class QualityPlanificationController extends Controller
             'frequences' => QualityPlanification::FREQUENCES,
             'currentZone' => $zoneId ?: null,
             'currentStatut' => $statut,
+            'currentFrequence' => $frequence,
             'currentDate' => $date,
+            'perPage' => $perPage,
             'reminders' => $this->planning->reminders($user),
         ]);
     }

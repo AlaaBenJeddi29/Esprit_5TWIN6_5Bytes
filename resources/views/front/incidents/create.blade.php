@@ -18,7 +18,7 @@
                     $inputClass = 'w-full rounded-md border border-stroke bg-transparent px-5 py-3 text-sm text-dark outline-none focus:border-primary dark:border-dark-3 dark:text-white';
                 @endphp
 
-                <form method="POST" action="{{ route('citizen.incidents.store') }}" class="rounded-md bg-white p-6 shadow-1 dark:bg-dark-2 md:p-8">
+                <form novalidate method="POST" action="{{ route('citizen.incidents.store') }}" class="rounded-md bg-white p-6 shadow-1 dark:bg-dark-2 md:p-8">
                     @csrf
 
                     <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
@@ -58,6 +58,82 @@
                                       class="{{ $inputClass }} @error('description') border-red-500 @enderror"
                                       placeholder="Décrivez ce que vous observez, depuis quand, et tout élément utile.">{{ old('description') }}</textarea>
                             @error('description')<p class="mt-1 text-xs text-red-500">{{ $message }}</p>@enderror
+
+                            <div class="mt-3"
+                                 data-incident-assist
+                                 data-questions-url="{{ route('citizen.incidents.assist.questions') }}"
+                                 data-compose-url="{{ route('citizen.incidents.assist.compose') }}">
+                                <div class="flex flex-wrap items-center gap-3">
+                                    <button type="button"
+                                            data-assist-start
+                                            disabled
+                                            aria-expanded="false"
+                                            aria-controls="incident-assist-panel"
+                                            class="inline-flex items-center justify-center rounded-md border border-primary px-4 py-2 text-sm font-medium text-primary hover:bg-primary hover:text-white disabled:cursor-not-allowed disabled:opacity-50">
+                                        Aide à la rédaction
+                                    </button>
+                                    <p data-assist-hint class="text-xs text-body-color dark:text-dark-6">
+                                        Saisissez au moins 10 caractères pour activer l'aide.
+                                    </p>
+                                </div>
+
+                                <div id="incident-assist-panel"
+                                     data-assist-panel
+                                     hidden
+                                     class="mt-4 rounded-md border border-stroke bg-gray-1 p-5 dark:border-dark-3 dark:bg-dark-3">
+                                    <div class="flex items-start justify-between gap-4">
+                                        <h3 class="text-sm font-semibold text-dark dark:text-white">Précisez votre signalement</h3>
+                                        <button type="button"
+                                                data-assist-cancel
+                                                class="rounded-sm text-xs font-medium text-body-color underline hover:text-primary dark:text-dark-6"
+                                                aria-label="Fermer l'aide à la rédaction">
+                                            Fermer
+                                        </button>
+                                    </div>
+
+                                    <p data-assist-source hidden class="mt-2 text-xs text-body-color dark:text-dark-6"></p>
+                                    <p data-assist-status role="status" aria-live="polite" class="mt-2 text-sm text-body-color dark:text-dark-6"></p>
+
+                                    <div data-assist-questions class="mt-4 space-y-4"></div>
+
+                                    <div data-assist-actions class="mt-4 flex flex-wrap gap-3" hidden>
+                                        <button type="button"
+                                                data-assist-compose
+                                                class="inline-flex items-center justify-center rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-white hover:bg-blue-dark disabled:cursor-not-allowed disabled:opacity-50">
+                                            Rédiger la description
+                                        </button>
+                                    </div>
+
+                                    <div data-assist-preview hidden class="mt-5 border-t border-stroke pt-4 dark:border-dark-3">
+                                        <label for="assist-preview-text" class="mb-2 block text-sm font-medium text-dark dark:text-white">Description proposée</label>
+                                        <textarea id="assist-preview-text" data-assist-preview-text rows="5" dir="auto" class="{{ $inputClass }}"></textarea>
+                                        <p class="mt-2 text-xs text-body-color dark:text-dark-6">
+                                            Suggestion générée automatiquement, vérifiez avant d'envoyer.
+                                        </p>
+                                        <p data-assist-mode hidden class="mt-1 text-xs text-body-color dark:text-dark-6">
+                                            Mode simplifié : suggestion construite localement, sans IA.
+                                        </p>
+                                        <div class="mt-3 flex flex-wrap gap-3">
+                                            <button type="button"
+                                                    data-assist-use
+                                                    class="inline-flex items-center justify-center rounded-md bg-secondary px-5 py-2.5 text-sm font-medium text-white hover:bg-[#0BB489]">
+                                                Utiliser ce texte
+                                            </button>
+                                            <button type="button"
+                                                    data-assist-keep
+                                                    class="inline-flex items-center justify-center rounded-md border border-stroke px-5 py-2.5 text-sm font-medium text-dark hover:border-primary hover:text-primary dark:border-dark-3 dark:text-white">
+                                                Garder mon texte
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <noscript>
+                                    <p class="mt-2 text-xs text-body-color dark:text-dark-6">
+                                        L'aide à la rédaction nécessite JavaScript. Le formulaire reste utilisable sans cette aide.
+                                    </p>
+                                </noscript>
+                            </div>
                         </div>
 
                         <div class="md:col-span-2">
@@ -134,7 +210,8 @@
 
                     <div class="mt-6 rounded-md bg-gray-1 p-4 text-xs text-body-color dark:bg-dark-3 dark:text-dark-7">
                         Une analyse locale automatique peut ajuster la catégorie, la priorité et détecter un éventuel doublon.
-                        Aucun fournisseur d'intelligence artificielle externe n'est utilisé.
+                        L'aide à la rédaction est facultative : lorsqu'elle est utilisée, seuls le titre, la description et vos
+                        réponses sont transmis au service d'IA configuré. Aucune donnée d'identité ni de contact n'est envoyée.
                     </div>
 
                     <div class="mt-6 flex flex-wrap items-center gap-4">
@@ -150,5 +227,5 @@
 @endsection
 
 @push('scripts')
-    @vite('resources/js/zone-map.js')
+    @vite(['resources/js/zone-map.js', 'resources/js/incident-assist.js'])
 @endpush

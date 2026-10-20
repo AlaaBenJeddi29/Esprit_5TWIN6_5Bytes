@@ -114,7 +114,7 @@
                         <p class="text-sm text-gray-500 dark:text-gray-400">Aucun commentaire.</p>
                     @endforelse
 
-                    <form method="POST" action="{{ route('back.incidents.comments.store', $incident) }}" class="border-t border-gray-100 pt-4 dark:border-gray-800">
+                    <form novalidate method="POST" action="{{ route('back.incidents.comments.store', $incident) }}" class="border-t border-gray-100 pt-4 dark:border-gray-800">
                         @csrf
                         <label for="body" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Ajouter un commentaire</label>
                         <textarea id="body" name="body" rows="3" class="{{ $inputClass }} @error('body') border-error-400 @enderror">{{ old('body') }}</textarea>
@@ -142,7 +142,7 @@
                 @if ($allowedTransitions === [])
                     <p class="mt-3 text-sm text-gray-500 dark:text-gray-400">Aucune transition disponible.</p>
                 @else
-                    <form method="POST" action="{{ route('back.incidents.status', $incident) }}" class="mt-3 space-y-3">
+                    <form novalidate method="POST" action="{{ route('back.incidents.status', $incident) }}" class="mt-3 space-y-3">
                         @csrf
                         @method('PATCH')
 

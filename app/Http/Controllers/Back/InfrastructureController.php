@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Back;
 
+use App\Http\Controllers\Concerns\ResolvesListingFilters;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Infrastructure\StoreInfrastructureRequest;
 use App\Http\Requests\Infrastructure\UpdateInfrastructureRequest;
@@ -14,24 +15,41 @@ use Illuminate\View\View;
 
 class InfrastructureController extends Controller
 {
+    use ResolvesListingFilters;
+
     public function index(Request $request): View
     {
         $search = $request->string('search')->toString();
+        $type = $request->string('type')->toString();
+        $statut = $request->string('statut')->toString();
         $zoneId = $request->integer('zone_id');
+        $perPage = $this->listingPerPage($request);
 
         $infrastructures = Infrastructure::query()
             ->with('zone')
-            ->when($search !== '', fn ($query) => $query->where('nom', 'like', "%{$search}%"))
+            ->when($search !== '', function ($query) use ($search) {
+                $query->where(function ($query) use ($search) {
+                    $query->where('nom', 'like', "%{$search}%")
+                        ->orWhere('materiau', 'like', "%{$search}%");
+                });
+            })
+            ->when(in_array($type, Infrastructure::TYPES, true), fn ($query) => $query->where('type', $type))
+            ->when(in_array($statut, Infrastructure::STATUTS, true), fn ($query) => $query->where('statut', $statut))
             ->when($zoneId, fn ($query) => $query->where('zone_id', $zoneId))
             ->orderBy('nom')
-            ->paginate(15)
+            ->paginate($perPage)
             ->withQueryString();
 
         return view('back.infrastructures.index', [
             'infrastructures' => $infrastructures,
             'zones' => Zone::orderBy('nom')->get(),
+            'types' => Infrastructure::TYPES,
+            'statuts' => Infrastructure::STATUTS,
             'search' => $search,
+            'currentType' => $type,
+            'currentStatut' => $statut,
             'currentZone' => $zoneId ?: null,
+            'perPage' => $perPage,
         ]);
     }
 
@@ -54,11 +72,16 @@ class InfrastructureController extends Controller
             ->with('success', "L'infrastructure « {$infrastructure->nom} » a été créée.");
     }
 
-    public function show(Infrastructure $infrastructure): View
+    public function show(Request $request, Infrastructure $infrastructure): View
     {
-        $infrastructure->load(['zone', 'maintenances' => fn ($query) => $query->latest('date_intervention')]);
+        $infrastructure->load('zone');
 
-        return view('back.infrastructures.show', compact('infrastructure'));
+        $maintenances = $infrastructure->maintenances()
+            ->latest('date_intervention')
+            ->paginate($this->listingPerPage($request), ['*'], 'maintenance_page')
+            ->withQueryString();
+
+        return view('back.infrastructures.show', compact('infrastructure', 'maintenances'));
     }
 
     public function edit(Infrastructure $infrastructure): View

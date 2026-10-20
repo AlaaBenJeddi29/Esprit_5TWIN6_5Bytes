@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Front;
 
+use App\Http\Controllers\Concerns\ResolvesListingFilters;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreAlertSubscriptionRequest;
 use App\Models\AlertSubscription;
@@ -12,18 +13,27 @@ use Illuminate\View\View;
 
 class AlertSubscriptionController extends Controller
 {
+    use ResolvesListingFilters;
+
     public function index(Request $request): View
     {
+        $type = $request->string('type_alerte')->toString();
+        $perPage = $this->listingPerPage($request);
+
         $subscriptions = AlertSubscription::query()
             ->where('user_id', $request->user()->id)
+            ->when(array_key_exists($type, AlertSubscription::TYPES), fn ($query) => $query->where('type_alerte', $type))
             ->with('zone')
             ->latest()
-            ->get();
+            ->paginate($perPage)
+            ->withQueryString();
 
         return view('front.citizen.subscriptions', [
             'subscriptions' => $subscriptions,
             'zones' => Zone::orderBy('nom')->get(),
             'types' => AlertSubscription::TYPES,
+            'currentType' => $type,
+            'perPage' => $perPage,
         ]);
     }
 

@@ -34,7 +34,7 @@ class OnlineReportEmailRecipientsTest extends TestCase
         ]);
         $this->app->instance(GestionReportService::class, $service);
 
-        $pdf = Mockery::mock();
+        $pdf = Mockery::mock(\Barryvdh\DomPDF\PDF::class);
         $pdf->shouldReceive('setPaper')->once()->with('a4')->andReturnSelf();
         $pdf->shouldReceive('output')->once()->andReturn('contenu-pdf');
         Pdf::shouldReceive('loadView')->once()->andReturn($pdf);

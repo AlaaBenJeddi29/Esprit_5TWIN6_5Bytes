@@ -5,6 +5,9 @@
 @section('content')
     @php
         $current = $currentStatus ?? '';
+        $inputClass = 'rounded-lg border-gray-300 bg-white text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90';
+        $hasFilters = $search !== '' || $current !== '' || $currentType !== '' || $from !== null || $to !== null;
+        $filtresSansStatut = request()->except(['page', 'status']);
         $statusTone = fn (string $status) => match ($status) {
             'nouveau' => 'bg-warning-50 text-warning-600 dark:bg-warning-500/15 dark:text-warning-400',
             'en_cours' => 'bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400',
@@ -28,19 +31,41 @@
         </x-slot:action>
     </x-back.page-header>
 
-    {{-- Filtre par statut --}}
+    {{-- Filtre par statut (conserve la recherche et les autres filtres) --}}
     <div class="mb-4 flex flex-wrap items-center gap-2">
-        <a href="{{ route('back.reports.index') }}"
+        <a href="{{ route('back.reports.index', $filtresSansStatut) }}"
            class="inline-flex items-center rounded-lg border px-3 py-2 text-sm font-medium transition {{ $current === '' ? 'border-brand-500 bg-brand-500 text-white' : 'border-gray-300 bg-white text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03]' }}">
             Tous
         </a>
         @foreach ($statuses as $key => $label)
-            <a href="{{ route('back.reports.index', ['status' => $key]) }}"
+            <a href="{{ route('back.reports.index', array_merge($filtresSansStatut, ['status' => $key])) }}"
                class="inline-flex items-center rounded-lg border px-3 py-2 text-sm font-medium transition {{ $current === $key ? 'border-brand-500 bg-brand-500 text-white' : 'border-gray-300 bg-white text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03]' }}">
                 {{ $label }}
             </a>
         @endforeach
     </div>
+
+    <form novalidate method="GET" action="{{ route('back.reports.index') }}" class="mb-5 flex flex-wrap gap-2">
+        <input type="search" name="search" value="{{ $search }}" placeholder="Titre, description ou adresse…" class="w-full max-w-xs {{ $inputClass }}">
+        <select name="type" class="{{ $inputClass }}">
+            <option value="">Tous les types</option>
+            @foreach ($types as $key => $label)
+                <option value="{{ $key }}" @selected($currentType === $key)>{{ $label }}</option>
+            @endforeach
+        </select>
+        <input type="date" name="from" value="{{ $from }}" aria-label="Signalés à partir du" title="Signalés à partir du" class="{{ $inputClass }}">
+        <input type="date" name="to" value="{{ $to }}" aria-label="Signalés jusqu'au" title="Signalés jusqu'au" class="{{ $inputClass }}">
+        @if ($current !== '')
+            <input type="hidden" name="status" value="{{ $current }}">
+        @endif
+        <input type="hidden" name="per_page" value="{{ $perPage }}">
+        <button type="submit" class="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">Filtrer</button>
+        @if ($hasFilters)
+            <a href="{{ route('back.reports.index') }}" class="inline-flex items-center justify-center rounded-lg px-3 py-2.5 text-sm font-medium text-gray-500 transition hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                Réinitialiser
+            </a>
+        @endif
+    </form>
 
     <div class="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
         @if ($reports->isNotEmpty())
@@ -80,14 +105,12 @@
                 </table>
             </div>
 
-            <div class="border-t border-gray-100 px-5 py-4 dark:border-gray-800">
-                {{ $reports->links() }}
-            </div>
+            <x-back.pagination :paginator="$reports" label="signalements" />
         @else
             <div class="p-5">
                 <x-back.empty-state
                     title="Aucun signalement trouvé"
-                    message="{{ $current ? 'Aucun signalement pour ce statut.' : 'Aucun signalement enregistré pour le moment.' }}"
+                    message="{{ $hasFilters ? 'Aucun signalement ne correspond aux filtres appliqués.' : 'Aucun signalement enregistré pour le moment.' }}"
                 >
                     <x-slot:action>
                         <a href="{{ route('back.reports.create') }}" class="inline-flex items-center justify-center rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white shadow-theme-xs transition hover:bg-brand-600">

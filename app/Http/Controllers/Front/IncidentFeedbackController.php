@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Front;
 
+use App\Http\Controllers\Concerns\ResolvesListingFilters;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Feedback\StoreIncidentFeedbackRequest;
 use App\Models\Incident\Incident;
@@ -20,6 +21,8 @@ use Illuminate\View\View;
 
 class IncidentFeedbackController extends Controller
 {
+    use ResolvesListingFilters;
+
     public function __construct(
         private readonly ComplaintWorkflowService $complaints,
         private readonly ComplaintNotifier $notifier,
@@ -31,6 +34,9 @@ class IncidentFeedbackController extends Controller
     public function index(Request $request): View
     {
         $user = $request->user();
+        $search = $request->string('search')->toString();
+        $complaintStatus = $request->string('complaint_status')->toString();
+        $perPage = $this->listingPerPage($request, 10);
 
         $incidents = Incident::query()
             ->where('user_id', $user->id)
@@ -38,15 +44,32 @@ class IncidentFeedbackController extends Controller
                 $query->where('status', 'traite')
                     ->orWhereHas('feedbacks', fn ($query) => $query->where('user_id', $user->id));
             })
+            ->when($search !== '', function ($query) use ($search) {
+                $query->where(function ($query) use ($search) {
+                    $query->where('reference', 'like', "%{$search}%")
+                        ->orWhere('title', 'like', "%{$search}%");
+                });
+            })
+            ->when(array_key_exists($complaintStatus, IncidentFeedback::COMPLAINT_STATUSES), fn ($query) => $query->whereHas(
+                'feedbacks',
+                fn ($query) => $query->where('user_id', $user->id)->where('complaint_status', $complaintStatus),
+            ))
             ->with([
                 'zone',
                 'feedbacks' => fn ($query) => $query->where('user_id', $user->id),
             ])
             ->latest('resolved_at')
             ->latest('id')
-            ->paginate(10);
+            ->paginate($perPage)
+            ->withQueryString();
 
-        return view('front.feedbacks.index', compact('incidents'));
+        return view('front.feedbacks.index', [
+            'incidents' => $incidents,
+            'complaintStatuses' => IncidentFeedback::COMPLAINT_STATUSES,
+            'search' => $search,
+            'currentComplaintStatus' => $complaintStatus,
+            'perPage' => $perPage,
+        ]);
     }
 
     public function store(StoreIncidentFeedbackRequest $request, Incident $incident): RedirectResponse

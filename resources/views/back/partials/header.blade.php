@@ -131,7 +131,7 @@
                         </li>
                     </ul>
 
-                    <form method="POST" action="{{ route('logout') }}" class="mt-3">
+                    <form novalidate method="POST" action="{{ route('logout') }}" class="mt-3">
                         @csrf
                         <button type="submit" class="group flex w-full items-center gap-3 rounded-lg px-3 py-2 font-medium text-gray-700 text-theme-sm hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300">
                             <svg class="h-5 w-5 text-gray-500 group-hover:text-gray-700 dark:text-gray-400 dark:group-hover:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
