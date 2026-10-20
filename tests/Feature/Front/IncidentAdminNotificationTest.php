@@ -115,7 +115,7 @@ class IncidentAdminNotificationTest extends TestCase
         $this->assertStringContainsString($incident->reference, $html);
         $this->assertStringContainsString(e($incident->title), $html);
         $this->assertStringContainsString(e($incident->description), $html);
-        $this->assertStringContainsString($incident->typeLabel(), $html);
+        $this->assertStringContainsString(e($incident->typeLabel()), $html);
         $this->assertStringContainsString($incident->severityLabel(), $html);
         $this->assertStringContainsString($incident->priorityLabel(), $html);
         $this->assertStringContainsString($incident->statusLabel(), $html);

@@ -77,7 +77,16 @@ class IncidentSimilarityService
             }
         }
 
-        usort($scored, fn (array $left, array $right) => $right['score'] <=> $left['score']);
+        // Score décroissant, puis identifiant décroissant pour départager les
+        // ex æquo (même score, même horodatage) de façon déterministe quel que
+        // soit le moteur de base de données.
+        usort($scored, fn (array $left, array $right): int => [
+            $right['score'],
+            $right['incident']->getKey(),
+        ] <=> [
+            $left['score'],
+            $left['incident']->getKey(),
+        ]);
 
         $scored = array_slice($scored, 0, $maximumSuggestions);
 
@@ -124,6 +133,10 @@ class IncidentSimilarityService
                 fn ($query) => $query->where('infrastructure_id', $incident->infrastructure_id),
             )
             ->latest('reported_at')
+            // Départage déterministe des horodatages identiques : sans lui,
+            // MySQL et MariaDB peuvent renvoyer les ex æquo dans un ordre
+            // différent, ce qui change l'ordre du lot envoyé à l'IA.
+            ->orderByDesc('id')
             ->limit($limit)
             ->get();
     }

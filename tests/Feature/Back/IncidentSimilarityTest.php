@@ -71,6 +71,23 @@ class IncidentSimilarityTest extends TestCase
         $this->assertNotContains($outOfWindow->id, $ids);
     }
 
+    public function test_candidate_order_is_deterministic_when_scores_and_timestamps_tie(): void
+    {
+        $source = $this->incident();
+        $reportedAt = now()->startOfSecond();
+        $first = $this->incident(['zone_id' => $source->zone_id, 'reported_at' => $reportedAt]);
+        $second = $this->incident(['zone_id' => $source->zone_id, 'reported_at' => $reportedAt]);
+
+        $ids = app(IncidentSimilarityService::class)
+            ->detect($source)
+            ->pluck('similar_incident_id')
+            ->all();
+
+        // Même score et même horodatage : l'identifiant décroissant tranche,
+        // afin que MySQL et MariaDB produisent le même ordre.
+        $this->assertSame([$second->id, $first->id], $ids);
+    }
+
     public function test_detection_is_idempotent_and_never_creates_self_similarity(): void
     {
         $source = $this->incident();
